@@ -9,6 +9,8 @@ vi.mock('../../src/runner/preflight.js', () => ({
   runPreflight: runPreflightMock,
 }))
 
+const validMarkdownSpec = `# Spec\n\n## Preconditions\n- ready\n\n## Steps\n1. Navigate to /\n`
+
 beforeEach(() => {
   runPreflightMock.mockClear()
 })
@@ -24,10 +26,10 @@ describe('autoqa run (args & spec discovery)', () => {
       const specsDir = join(tempDir, 'specs')
       mkdirSync(join(specsDir, 'sub'), { recursive: true })
 
-      writeFileSync(join(specsDir, 'z.md'), '# z\n', 'utf8')
-      writeFileSync(join(specsDir, 'a.md'), '# a\n', 'utf8')
-      writeFileSync(join(specsDir, 'sub', 'm.md'), '# m\n', 'utf8')
-      writeFileSync(join(specsDir, 'sub', '1.md'), '# 1\n', 'utf8')
+      writeFileSync(join(specsDir, 'z.md'), validMarkdownSpec, 'utf8')
+      writeFileSync(join(specsDir, 'a.md'), validMarkdownSpec, 'utf8')
+      writeFileSync(join(specsDir, 'sub', 'm.md'), validMarkdownSpec, 'utf8')
+      writeFileSync(join(specsDir, 'sub', '1.md'), validMarkdownSpec, 'utf8')
       writeFileSync(join(specsDir, 'sub', 'ignore.txt'), 'ignore', 'utf8')
 
       process.chdir(tempDir)
@@ -65,7 +67,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -307,7 +309,7 @@ describe('autoqa run (args & spec discovery)', () => {
       mkdirSync(specsDir, { recursive: true })
 
       const realSpec = join(specsDir, 'real.md')
-      writeFileSync(realSpec, '# real\n', 'utf8')
+      writeFileSync(realSpec, validMarkdownSpec, 'utf8')
 
       const linkedSpec = join(specsDir, 'linked.md')
       symlinkSync(realSpec, linkedSpec)
@@ -457,7 +459,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -485,7 +487,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -518,7 +520,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -546,7 +548,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -574,7 +576,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
     try {
       const specPath = join(tempDir, 'single.md')
-      writeFileSync(specPath, '# single\n', 'utf8')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
 
       process.chdir(tempDir)
 
@@ -590,6 +592,46 @@ describe('autoqa run (args & spec discovery)', () => {
         debug: false,
         baseUrl: 'http://example.test',
       })
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('exits with code 2 when any discovered spec has invalid structure', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'autoqa-run-'))
+    const originalCwd = process.cwd()
+
+    try {
+      const specPath = join(tempDir, 'bad.md')
+      writeFileSync(specPath, `# Bad\n\n## Steps\n1. Only steps\n`, 'utf8')
+
+      process.chdir(tempDir)
+
+      const { createProgram } = await import('../../src/cli/program.js')
+      const program = createProgram()
+      let errOutput = ''
+
+      program.configureOutput({
+        writeOut: () => {},
+        writeErr: (str: string) => {
+          errOutput += str
+        },
+      })
+      program.exitOverride()
+
+      let exitCode: number | undefined
+      try {
+        await program.parseAsync(['run', specPath, '--url', 'http://example.test'], { from: 'user' })
+      } catch (err: any) {
+        exitCode = err.exitCode
+      }
+
+      expect(exitCode).toBe(2)
+      expect(errOutput).toContain('Invalid spec structure')
+      expect(errOutput).toContain(specPath)
+      expect(errOutput).toContain('MARKDOWN_MISSING_PRECONDITIONS')
+      expect(runPreflightMock).not.toHaveBeenCalled()
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })

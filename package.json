@@ -18,6 +18,7 @@
     "playwright": "1.57.0",
     "pino": "10.1.0",
     "remark-parse": "11.0.0",
+    "unified": "11.0.5",
     "zod": "3.24.1"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 
 import { Command } from 'commander'
 
@@ -10,6 +11,8 @@ import { writeOutLine } from '../output.js'
 import { discoverMarkdownSpecs } from '../../specs/discover.js'
 import { validateRunArgs } from '../../runner/validate-run-args.js'
 import { runPreflight } from '../../runner/preflight.js'
+import { parseMarkdownSpec } from '../../markdown/parse-markdown-spec.js'
+import type { MarkdownSpec } from '../../markdown/spec-types.js'
 
 function sanitizeBaseUrlForLog(baseUrl: string): string {
   try {
@@ -74,6 +77,51 @@ export function registerRunCommand(program: Command) {
 
       if (validated.value.debug) {
         writeOutLine(writeErr, `node=${process.version}`)
+      }
+
+      const parsedSpecs: Array<{ specPath: string; spec: MarkdownSpec }> = []
+
+      for (const specPath of result.specs) {
+        let markdown: string
+        try {
+          markdown = readFileSync(specPath, 'utf8')
+        } catch (err: unknown) {
+          if (isUserCorrectableFsError(err)) {
+            program.error(`Failed to read spec: ${specPath}`, { exitCode: 2 })
+            return
+          }
+
+          program.error(`Failed to read spec: ${specPath}`)
+          return
+        }
+
+        let parsed: ReturnType<typeof parseMarkdownSpec>
+        try {
+          parsed = parseMarkdownSpec(markdown)
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err)
+          program.error(`Failed to parse spec: ${specPath}\n${message}`, { exitCode: 1 })
+          return
+        }
+
+        if (!parsed.ok) {
+          program.error(
+            `Invalid spec structure: ${specPath}\ncode=${parsed.error.code}\n${parsed.error.message}`,
+            { exitCode: 2 },
+          )
+          return
+        }
+
+        parsedSpecs.push({ specPath, spec: parsed.value })
+      }
+
+      if (validated.value.debug) {
+        writeOutLine(writeErr, `parsedSpecs=${parsedSpecs.length}`)
+        for (const p of parsedSpecs) {
+          writeOutLine(writeErr, `spec=${p.specPath}`)
+          writeOutLine(writeErr, `preconditions=${p.spec.preconditions.length}`)
+          writeOutLine(writeErr, `steps=${p.spec.steps.length}`)
+        }
       }
 
       const preflight = await runPreflight({
