@@ -4,15 +4,15 @@ import { join } from 'node:path'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const runPreflightMock = vi.fn(async (_options: any) => ({ ok: true as const }))
-vi.mock('../../src/runner/preflight.js', () => ({
-  runPreflight: runPreflightMock,
+const runSpecsMock = vi.fn(async (_options: any): Promise<any> => ({ ok: true }))
+vi.mock('../../src/runner/run-specs.js', () => ({
+  runSpecs: runSpecsMock,
 }))
 
 const validMarkdownSpec = `# Spec\n\n## Preconditions\n- ready\n\n## Steps\n1. Navigate to /\n`
 
 beforeEach(() => {
-  runPreflightMock.mockClear()
+  runSpecsMock.mockClear()
 })
 
 describe('autoqa run (args & spec discovery)', () => {
@@ -367,7 +367,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
       expect(exitCode).toBe(2)
       expect(errOutput).toContain('Base URL is required')
-      expect(runPreflightMock).not.toHaveBeenCalled()
+      expect(runSpecsMock).not.toHaveBeenCalled()
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
@@ -408,7 +408,7 @@ describe('autoqa run (args & spec discovery)', () => {
 
       expect(exitCode).toBe(2)
       expect(errOutput).toContain('Conflicting options')
-      expect(runPreflightMock).not.toHaveBeenCalled()
+      expect(runSpecsMock).not.toHaveBeenCalled()
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
@@ -446,14 +446,14 @@ describe('autoqa run (args & spec discovery)', () => {
 
       expect(exitCode).toBe(2)
       expect(errOutput).toContain('Invalid --url')
-      expect(runPreflightMock).not.toHaveBeenCalled()
+      expect(runSpecsMock).not.toHaveBeenCalled()
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
     }
   })
 
-  it('normalizes --url by removing trailing slash (passed to preflight)', async () => {
+  it('normalizes --url by removing trailing slash (passed to runSpecs)', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'autoqa-run-'))
     const originalCwd = process.cwd()
 
@@ -469,10 +469,55 @@ describe('autoqa run (args & spec discovery)', () => {
 
       await program.parseAsync(['run', specPath, '--url', 'http://example.test/'], { from: 'user' })
 
-      expect(runPreflightMock).toHaveBeenCalledTimes(1)
-      expect(runPreflightMock.mock.calls[0]?.[0]).toMatchObject({
+      expect(runSpecsMock).toHaveBeenCalledTimes(1)
+      expect(runSpecsMock.mock.calls[0]?.[0]).toMatchObject({
         baseUrl: 'http://example.test',
       })
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('exits with code 1 when runner reports spec execution failure', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'autoqa-run-'))
+    const originalCwd = process.cwd()
+
+    try {
+      const specPath = join(tempDir, 'single.md')
+      writeFileSync(specPath, validMarkdownSpec, 'utf8')
+
+      process.chdir(tempDir)
+
+      runSpecsMock.mockResolvedValueOnce({
+        ok: false,
+        code: 'SPEC_EXECUTION_FAILED',
+        message: 'spec failed',
+      })
+
+      const { createProgram } = await import('../../src/cli/program.js')
+      const program = createProgram()
+
+      let errOutput = ''
+      program.configureOutput({
+        writeOut: () => {},
+        writeErr: (str: string) => {
+          errOutput += str
+        },
+      })
+      program.exitOverride()
+
+      let exitCode: number | undefined
+
+      try {
+        await program.parseAsync(['run', specPath, '--url', 'http://example.test'], { from: 'user' })
+      } catch (err: any) {
+        exitCode = err.exitCode
+      }
+
+      expect(exitCode).toBe(1)
+      expect(errOutput).toContain('spec failed')
+      expect(runSpecsMock).toHaveBeenCalledTimes(1)
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
@@ -530,8 +575,8 @@ describe('autoqa run (args & spec discovery)', () => {
 
       await program.parseAsync(['run', specPath, '--url', 'http://example.test'], { from: 'user' })
 
-      expect(runPreflightMock).toHaveBeenCalledTimes(1)
-      expect(runPreflightMock.mock.calls[0]?.[0]).toMatchObject({
+      expect(runSpecsMock).toHaveBeenCalledTimes(1)
+      expect(runSpecsMock.mock.calls[0]?.[0]).toMatchObject({
         headless: true,
         debug: false,
         baseUrl: 'http://example.test',
@@ -558,8 +603,8 @@ describe('autoqa run (args & spec discovery)', () => {
 
       await program.parseAsync(['run', specPath, '--url', 'http://example.test', '--debug'], { from: 'user' })
 
-      expect(runPreflightMock).toHaveBeenCalledTimes(1)
-      expect(runPreflightMock.mock.calls[0]?.[0]).toMatchObject({
+      expect(runSpecsMock).toHaveBeenCalledTimes(1)
+      expect(runSpecsMock.mock.calls[0]?.[0]).toMatchObject({
         headless: false,
         debug: true,
         baseUrl: 'http://example.test',
@@ -586,8 +631,8 @@ describe('autoqa run (args & spec discovery)', () => {
 
       await program.parseAsync(['run', specPath, '--url', 'http://example.test', '--headless'], { from: 'user' })
 
-      expect(runPreflightMock).toHaveBeenCalledTimes(1)
-      expect(runPreflightMock.mock.calls[0]?.[0]).toMatchObject({
+      expect(runSpecsMock).toHaveBeenCalledTimes(1)
+      expect(runSpecsMock.mock.calls[0]?.[0]).toMatchObject({
         headless: true,
         debug: false,
         baseUrl: 'http://example.test',
@@ -631,7 +676,7 @@ describe('autoqa run (args & spec discovery)', () => {
       expect(errOutput).toContain('Invalid spec structure')
       expect(errOutput).toContain(specPath)
       expect(errOutput).toContain('MARKDOWN_MISSING_PRECONDITIONS')
-      expect(runPreflightMock).not.toHaveBeenCalled()
+      expect(runSpecsMock).not.toHaveBeenCalled()
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })

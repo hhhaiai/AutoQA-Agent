@@ -10,7 +10,7 @@ import { writeOutLine } from '../output.js'
 
 import { discoverMarkdownSpecs } from '../../specs/discover.js'
 import { validateRunArgs } from '../../runner/validate-run-args.js'
-import { runPreflight } from '../../runner/preflight.js'
+import { runSpecs } from '../../runner/run-specs.js'
 import { parseMarkdownSpec } from '../../markdown/parse-markdown-spec.js'
 import type { MarkdownSpec } from '../../markdown/spec-types.js'
 
@@ -26,7 +26,7 @@ function sanitizeBaseUrlForLog(baseUrl: string): string {
 export function registerRunCommand(program: Command) {
   program
     .command('run')
-    .description('Discover Markdown specs under a file or directory (MVP: discovery + preflight)')
+    .description('Discover Markdown specs under a file or directory and run them')
     .argument('<file-or-dir>', 'Markdown spec file or directory containing Markdown specs')
     .option('--url <baseUrl>', 'Base URL to test against (e.g. http://localhost:3000)')
     .option('--debug', 'Run in debug mode (headed browser + extra logs)')
@@ -124,23 +124,26 @@ export function registerRunCommand(program: Command) {
         }
       }
 
-      const preflight = await runPreflight({
+      const runResult = await runSpecs({
+        runId,
         baseUrl: validated.value.baseUrl,
         headless: validated.value.headless,
         debug: validated.value.debug,
+        specs: parsedSpecs,
       })
 
-      if (!preflight.ok) {
-        program.error(preflight.message, { exitCode: 2 })
+      if (!runResult.ok) {
+        const exitCode = runResult.code === 'SPEC_EXECUTION_FAILED' ? 1 : 2
+        program.error(runResult.message, { exitCode })
         return
       }
 
-      if (validated.value.debug && preflight.playwrightVersion) {
-        writeOutLine(writeErr, `playwrightVersion=${preflight.playwrightVersion}`)
+      if (validated.value.debug && runResult.playwrightVersion) {
+        writeOutLine(writeErr, `playwrightVersion=${runResult.playwrightVersion}`)
       }
 
-      if (validated.value.debug && preflight.chromiumVersion) {
-        writeOutLine(writeErr, `chromiumVersion=${preflight.chromiumVersion}`)
+      if (validated.value.debug && runResult.chromiumVersion) {
+        writeOutLine(writeErr, `chromiumVersion=${runResult.chromiumVersion}`)
       }
 
       for (const specPath of result.specs) {
