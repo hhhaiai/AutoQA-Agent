@@ -61,6 +61,11 @@ export type ToolResultEvent = LogEventBase & {
     relativePath?: string
   }
   screenshotError?: string
+  snapshot?: {
+    ariaRelativePath?: string
+    axRelativePath?: string
+  }
+  snapshotError?: string
 }
 
 export type LogEvent =

@@ -155,6 +155,10 @@ describe('createLogger', () => {
         height: 768,
         relativePath: '.autoqa/runs/' + runId + '/screenshots/navigate-1.jpg',
       },
+      snapshot: {
+        ariaRelativePath: '.autoqa/runs/' + runId + '/snapshots/navigate-1.aria.yaml',
+        axRelativePath: '.autoqa/runs/' + runId + '/snapshots/navigate-1.ax.json',
+      },
     })
 
     await logger.flush()
@@ -177,6 +181,8 @@ describe('createLogger', () => {
     expect(toolResult.toolDurationMs).toBe(150)
     expect(toolResult.ok).toBe(true)
     expect(toolResult.screenshot.relativePath).toContain('.autoqa/runs/')
+    expect(toolResult.snapshot.ariaRelativePath).toContain('.autoqa/runs/')
+    expect(toolResult.snapshot.axRelativePath).toContain('.autoqa/runs/')
   })
 
   it('logs tool error with error fields', async () => {

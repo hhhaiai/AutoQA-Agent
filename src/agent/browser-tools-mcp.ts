@@ -8,6 +8,7 @@ import type { ContentBlock } from './pre-action-screenshot.js'
 import { runWithPreActionScreenshot } from './pre-action-screenshot.js'
 import type { Logger } from '../logging/index.js'
 import { redactToolInput, sanitizeRelativePath } from '../logging/index.js'
+import { captureSnapshots, writeSnapshotsIfNeeded, type SnapshotMeta } from '../browser/snapshot.js'
 
 function normalizeToolStringInput(value: string): string {
   const s = (value ?? '').trim()
@@ -95,7 +96,11 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
     toolName: string,
     startTime: number,
     result: { ok: boolean; error?: any },
-    meta: { error?: string; screenshot?: { mimeType?: string; width?: number; height?: number; path?: string } },
+    meta: {
+      error?: string
+      screenshot?: { mimeType?: string; width?: number; height?: number; path?: string }
+      snapshot?: SnapshotMeta
+    },
   ): void {
     const event: any = {
       event: 'autoqa.tool.result',
@@ -126,7 +131,29 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
       event.screenshotError = meta.error
     }
 
+    if (meta.snapshot?.ariaPath || meta.snapshot?.axPath) {
+      event.snapshot = {
+        ariaRelativePath: meta.snapshot.ariaPath,
+        axRelativePath: meta.snapshot.axPath,
+      }
+    }
+    if (meta.snapshot?.error) {
+      event.snapshotError = meta.snapshot.error
+    }
+
     logger.log(event)
+  }
+
+  async function capturePreActionSnapshot() {
+    try {
+      return await captureSnapshots(options.page)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      return {
+        aria: { ok: false as const, error: `Failed to capture ARIA snapshot: ${msg}` },
+        ax: { ok: false as const, error: `Failed to capture AX snapshot: ${msg}` },
+      }
+    }
   }
 
   return createSdkMcpServer({
@@ -141,23 +168,38 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
         },
         async (args) => {
           const url = normalizeToolStringInput(args.url)
+          const fileBaseName = nextFileBaseName('navigate')
           const startTime = Date.now()
           logToolCall('navigate', { url })
           writeDebug(options.debug, `mcp_tool=navigate url=${url}`)
+
+          const snapshotCapturePromise = capturePreActionSnapshot()
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
             debug: options.debug,
             cwd: options.cwd,
-            fileBaseName: nextFileBaseName('navigate'),
+            fileBaseName,
             quality: DEFAULT_JPEG_QUALITY,
-            action: () => navigate({ page: options.page, baseUrl: options.baseUrl, url }),
+            action: async () => {
+              await snapshotCapturePromise
+              return navigate({ page: options.page, baseUrl: options.baseUrl, url })
+            },
           })
 
-          logToolResult('navigate', startTime, result as any, meta)
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = await writeSnapshotsIfNeeded(
+            snapshotCapture,
+            { cwd: options.cwd, runId: options.runId, fileBaseName },
+            Boolean(options.debug || !result.ok),
+          )
+
+          logToolResult('navigate', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
           return { content, isError: !result.ok }
@@ -171,23 +213,38 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
         },
         async (args) => {
           const targetDescription = normalizeToolStringInput(args.targetDescription)
+          const fileBaseName = nextFileBaseName('click')
           const startTime = Date.now()
           logToolCall('click', { targetDescription })
           writeDebug(options.debug, `mcp_tool=click target=${targetDescription}`)
+
+          const snapshotCapturePromise = capturePreActionSnapshot()
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
             debug: options.debug,
             cwd: options.cwd,
-            fileBaseName: nextFileBaseName('click'),
+            fileBaseName,
             quality: DEFAULT_JPEG_QUALITY,
-            action: () => click({ page: options.page, targetDescription }),
+            action: async () => {
+              await snapshotCapturePromise
+              return click({ page: options.page, targetDescription })
+            },
           })
 
-          logToolResult('click', startTime, result as any, meta)
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = await writeSnapshotsIfNeeded(
+            snapshotCapture,
+            { cwd: options.cwd, runId: options.runId, fileBaseName },
+            Boolean(options.debug || !result.ok),
+          )
+
+          logToolResult('click', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
           return { content, isError: !result.ok }
@@ -203,23 +260,38 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
         async (args) => {
           const targetDescription = normalizeToolStringInput(args.targetDescription)
           const text = normalizeToolStringInput(args.text)
+          const fileBaseName = nextFileBaseName('fill')
           const startTime = Date.now()
           logToolCall('fill', { targetDescription, text })
           writeDebug(options.debug, `mcp_tool=fill target=${targetDescription} text_len=${text.length}`)
+
+          const snapshotCapturePromise = capturePreActionSnapshot()
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
             debug: options.debug,
             cwd: options.cwd,
-            fileBaseName: nextFileBaseName('fill'),
+            fileBaseName,
             quality: DEFAULT_JPEG_QUALITY,
-            action: () => fill({ page: options.page, targetDescription, text }),
+            action: async () => {
+              await snapshotCapturePromise
+              return fill({ page: options.page, targetDescription, text })
+            },
           })
 
-          logToolResult('fill', startTime, result as any, meta)
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = await writeSnapshotsIfNeeded(
+            snapshotCapture,
+            { cwd: options.cwd, runId: options.runId, fileBaseName },
+            Boolean(options.debug || !result.ok),
+          )
+
+          logToolResult('fill', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
           return { content, isError: !result.ok }
@@ -233,23 +305,38 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
           amount: z.number(),
         },
         async (args) => {
+          const fileBaseName = nextFileBaseName('scroll')
           const startTime = Date.now()
           logToolCall('scroll', { direction: args.direction, amount: args.amount })
           writeDebug(options.debug, `mcp_tool=scroll direction=${args.direction} amount=${args.amount}`)
+
+          const snapshotCapturePromise = capturePreActionSnapshot()
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
             debug: options.debug,
             cwd: options.cwd,
-            fileBaseName: nextFileBaseName('scroll'),
+            fileBaseName,
             quality: DEFAULT_JPEG_QUALITY,
-            action: () => scroll({ page: options.page, direction: args.direction, amount: args.amount }),
+            action: async () => {
+              await snapshotCapturePromise
+              return scroll({ page: options.page, direction: args.direction, amount: args.amount })
+            },
           })
 
-          logToolResult('scroll', startTime, result as any, meta)
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = await writeSnapshotsIfNeeded(
+            snapshotCapture,
+            { cwd: options.cwd, runId: options.runId, fileBaseName },
+            Boolean(options.debug || !result.ok),
+          )
+
+          logToolResult('scroll', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
           return { content, isError: !result.ok }
@@ -262,23 +349,38 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
           seconds: z.number(),
         },
         async (args) => {
+          const fileBaseName = nextFileBaseName('wait')
           const startTime = Date.now()
           logToolCall('wait', { seconds: args.seconds })
           writeDebug(options.debug, `mcp_tool=wait seconds=${args.seconds}`)
+
+          const snapshotCapturePromise = capturePreActionSnapshot()
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
             debug: options.debug,
             cwd: options.cwd,
-            fileBaseName: nextFileBaseName('wait'),
+            fileBaseName,
             quality: DEFAULT_JPEG_QUALITY,
-            action: () => wait({ page: options.page, seconds: args.seconds }),
+            action: async () => {
+              await snapshotCapturePromise
+              return wait({ page: options.page, seconds: args.seconds })
+            },
           })
 
-          logToolResult('wait', startTime, result as any, meta)
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = await writeSnapshotsIfNeeded(
+            snapshotCapture,
+            { cwd: options.cwd, runId: options.runId, fileBaseName },
+            Boolean(options.debug || !result.ok),
+          )
+
+          logToolResult('wait', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
           return { content, isError: !result.ok }

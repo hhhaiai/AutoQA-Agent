@@ -524,6 +524,13 @@ describe('autoqa run (args & spec discovery)', () => {
 
       expect(exitCode).toBe(1)
       expect(errOutput).toContain('spec failed')
+
+      const runIdMatch = errOutput.match(/runId=([^\n]+)/)
+      expect(runIdMatch).not.toBeNull()
+
+      const runId = runIdMatch?.[1]
+      expect(errOutput).toContain(`snapshotDir=.autoqa/runs/${runId}/snapshots`)
+      expect(errOutput).not.toContain(tempDir)
       expect(runSpecsMock).toHaveBeenCalledTimes(1)
     } finally {
       process.chdir(originalCwd)

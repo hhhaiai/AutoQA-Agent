@@ -197,6 +197,8 @@ export function registerRunCommand(program: Command) {
       if (!runResult.ok) {
         const exitCode = runResult.code === 'SPEC_EXECUTION_FAILED' ? 1 : 2
 
+        writeOutLine(writeErr, `snapshotDir=${artifactRoot}/snapshots`)
+
         logger.log({
           event: 'autoqa.run.finished',
           runId,
