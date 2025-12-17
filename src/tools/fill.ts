@@ -129,7 +129,7 @@ function buildFuzzyRegex(value: string): RegExp | undefined {
   return new RegExp(`${lookaheads}.*`, 'i')
 }
 
-async function resolveFillTarget(page: Page, targetDescription: string): Promise<Locator | undefined> {
+export async function resolveFillTarget(page: Page, targetDescription: string): Promise<Locator | undefined> {
   const candidates: Locator[] = []
 
   for (const selector of extractAttributeSelectors(targetDescription)) {

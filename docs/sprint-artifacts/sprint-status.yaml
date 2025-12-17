@@ -67,7 +67,7 @@ development_status:
   3-4-failure-artifacts-exit-codes-ci: done
   epic-3-retrospective: optional
 
-  epic-4: backlog
-  4-1-runtime-locator-validation-ir: backlog
+  epic-4: in-progress
+  4-1-runtime-locator-validation-ir: done
   4-2-auto-export-playwright-test: backlog
   epic-4-retrospective: optional

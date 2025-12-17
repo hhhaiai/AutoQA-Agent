@@ -94,7 +94,7 @@ async function pickFirstMatch(locator: Locator): Promise<Locator | undefined> {
   }
 }
 
-async function trySelectOptionByLabel(page: Page, label: string): Promise<boolean> {
+export async function trySelectOptionByLabel(page: Page, label: string): Promise<Locator | undefined> {
   const candidates: Locator[] = []
 
   try {
@@ -125,16 +125,16 @@ async function trySelectOptionByLabel(page: Page, label: string): Promise<boolea
 
         try {
           await select.selectOption({ label })
-          return true
+          return select
         } catch {}
       }
     } catch {}
   }
 
-  return false
+  return undefined
 }
 
-async function resolveClickTarget(page: Page, targetDescription: string): Promise<Locator | undefined> {
+export async function resolveClickTarget(page: Page, targetDescription: string): Promise<Locator | undefined> {
   const candidates: Locator[] = []
 
   for (const selector of extractAttributeSelectors(targetDescription)) {

@@ -4,12 +4,15 @@ import { z } from 'zod'
 import type { Locator, Page } from 'playwright'
 
 import { click, fill, navigate, scroll, wait, assertTextPresent, assertElementVisible } from '../tools/index.js'
+import { resolveClickTarget, trySelectOptionByLabel } from '../tools/click.js'
+import { resolveFillTarget } from '../tools/fill.js'
 import { toToolError } from '../tools/playwright-error.js'
 import type { ContentBlock } from './pre-action-screenshot.js'
 import { runWithPreActionScreenshot } from './pre-action-screenshot.js'
 import type { Logger } from '../logging/index.js'
 import { redactToolInput, sanitizeRelativePath } from '../logging/index.js'
 import { captureSnapshots, writeSnapshotsIfNeeded, type SnapshotMeta } from '../browser/snapshot.js'
+import { createIRRecorder, nullRecorder, type IRRecorder, type PreActionResult, type IRToolName } from '../ir/index.js'
 
 type ArtifactMode = 'all' | 'fail' | 'none'
 type ToolContextMode = 'screenshot' | 'snapshot' | 'none'
@@ -96,6 +99,7 @@ export type CreateBrowserToolsMcpServerOptions = {
   specPath: string
   logger: Logger
   onToolCall?: (toolName: string, stepIndex: number | null, isError: boolean) => void
+  enableIR?: boolean
 }
 
 function parseStepIndex(value: unknown): number | null {
@@ -135,6 +139,15 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
   const { logger, specPath } = options
   const cwd = options.cwd ?? process.cwd()
+
+  const irRecorder: IRRecorder | typeof nullRecorder = options.enableIR !== false
+    ? createIRRecorder({
+        cwd,
+        runId: options.runId,
+        specPath,
+        enabled: true,
+      })
+    : nullRecorder
 
   function logToolCall(toolName: string, toolInput: Record<string, unknown>, stepIndex: number | null): void {
     logger.log({
@@ -357,6 +370,8 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
 
+          let irPreActionResult: PreActionResult | null = null
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
@@ -381,13 +396,61 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
                       },
                     }
                   }
+                  irPreActionResult = await irRecorder.prepareForAction(options.page, 'click', locator)
                   await locator.click()
                   return { ok: true as const, data: { ref, targetDescription } }
                 } catch (err: unknown) {
                   return { ok: false as const, error: toToolError(err) }
                 }
               }
-              return click({ page: options.page, targetDescription })
+              try {
+                const locator = await resolveClickTarget(options.page, targetDescription)
+                if (!locator) {
+                  try {
+                    const selected = await trySelectOptionByLabel(options.page, targetDescription)
+                    if (selected) {
+                      if (!irPreActionResult) {
+                        irPreActionResult = await irRecorder.prepareForAction(options.page, 'click', selected)
+                      }
+                      return { ok: true as const, data: { targetDescription } }
+                    }
+                  } catch {
+                  }
+                  return {
+                    ok: false as const,
+                    error: {
+                      code: 'ELEMENT_NOT_FOUND',
+                      message: `Element not found: ${targetDescription}`,
+                      retriable: true,
+                      cause: undefined,
+                    },
+                  }
+                }
+
+                irPreActionResult = await irRecorder.prepareForAction(options.page, 'click', locator)
+
+                try {
+                  await locator.click()
+                  return { ok: true as const, data: { targetDescription } }
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : String(err)
+                  if (msg.includes('intercepts pointer events') && msg.toLowerCase().includes('select')) {
+                    try {
+                      const selected = await trySelectOptionByLabel(options.page, targetDescription)
+                      if (selected) {
+                        if (!irPreActionResult) {
+                          irPreActionResult = await irRecorder.prepareForAction(options.page, 'click', selected)
+                        }
+                        return { ok: true as const, data: { targetDescription } }
+                      }
+                    } catch {
+                    }
+                  }
+                  return { ok: false as const, error: toToolError(err) }
+                }
+              } catch (err: unknown) {
+                return { ok: false as const, error: toToolError(err) }
+              }
             },
           })
 
@@ -401,6 +464,19 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
             : ({ captured: false } as SnapshotMeta)
 
           logToolResult('click', startTime, result as any, stepIndex, { ...meta, snapshot: snapshotMeta })
+
+          if (result.ok && irRecorder.isEnabled()) {
+            await irRecorder.recordAction(
+              {
+                page: options.page,
+                toolName: 'click' as IRToolName,
+                toolInput: { targetDescription, ref },
+                stepIndex,
+              },
+              { ok: true },
+              irPreActionResult,
+            )
+          }
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
@@ -454,6 +530,8 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
 
+          let irPreActionResult: PreActionResult | null = null
+
           const { result, meta } = await runWithPreActionScreenshot({
             page: options.page,
             runId: options.runId,
@@ -478,26 +556,81 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
                       },
                     }
                   }
+                  const descendant = locator.locator('input, textarea, [contenteditable="true"]').first()
+                  let fillLocator: Locator = locator
                   try {
-                    await locator.fill(text)
+                    const dcount = await descendant.count()
+                    if (dcount > 0) fillLocator = descendant
+                  } catch {
+                  }
+
+                  irPreActionResult = await irRecorder.prepareForAction(options.page, 'fill', fillLocator)
+
+                  try {
+                    await fillLocator.fill(text)
                     return { ok: true as const, data: { ref, targetDescription, textLength: text.length } }
                   } catch (err: unknown) {
-                    try {
-                      const descendant = locator.locator('input, textarea, [contenteditable="true"]').first()
-                      const dcount = await descendant.count()
-                      if (dcount > 0) {
-                        await descendant.fill(text)
-                        return { ok: true as const, data: { ref, targetDescription, textLength: text.length } }
+                    if (fillLocator === locator) {
+                      try {
+                        const dcount = await descendant.count()
+                        if (dcount > 0) {
+                          irPreActionResult = await irRecorder.prepareForAction(options.page, 'fill', descendant)
+                          await descendant.fill(text)
+                          return { ok: true as const, data: { ref, targetDescription, textLength: text.length } }
+                        }
+                      } catch {
                       }
-                    } catch {
                     }
-                    throw err
+                    return { ok: false as const, error: toToolError(err) }
                   }
                 } catch (err: unknown) {
                   return { ok: false as const, error: toToolError(err) }
                 }
               }
-              return fill({ page: options.page, targetDescription, text })
+              try {
+                const locator = await resolveFillTarget(options.page, targetDescription)
+                if (!locator) {
+                  return {
+                    ok: false as const,
+                    error: {
+                      code: 'ELEMENT_NOT_FOUND',
+                      message: `Element not found: ${targetDescription}`,
+                      retriable: true,
+                      cause: undefined,
+                    },
+                  }
+                }
+
+                const descendant = locator.locator('input, textarea, [contenteditable="true"]').first()
+                let fillLocator: Locator = locator
+                try {
+                  const dcount = await descendant.count()
+                  if (dcount > 0) fillLocator = descendant
+                } catch {
+                }
+
+                irPreActionResult = await irRecorder.prepareForAction(options.page, 'fill', fillLocator)
+
+                try {
+                  await fillLocator.fill(text)
+                  return { ok: true as const, data: { targetDescription, textLength: text.length } }
+                } catch (err: unknown) {
+                  if (fillLocator === locator) {
+                    try {
+                      const dcount = await descendant.count()
+                      if (dcount > 0) {
+                        irPreActionResult = await irRecorder.prepareForAction(options.page, 'fill', descendant)
+                        await descendant.fill(text)
+                        return { ok: true as const, data: { targetDescription, textLength: text.length } }
+                      }
+                    } catch {
+                    }
+                  }
+                  return { ok: false as const, error: toToolError(err) }
+                }
+              } catch (err: unknown) {
+                return { ok: false as const, error: toToolError(err) }
+              }
             },
           })
 
@@ -511,6 +644,19 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
             : ({ captured: false } as SnapshotMeta)
 
           logToolResult('fill', startTime, result as any, stepIndex, { ...meta, snapshot: snapshotMeta })
+
+          if (result.ok && irRecorder.isEnabled()) {
+            await irRecorder.recordAction(
+              {
+                page: options.page,
+                toolName: 'fill' as IRToolName,
+                toolInput: { targetDescription, ref, text },
+                stepIndex,
+              },
+              { ok: true },
+              irPreActionResult,
+            )
+          }
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
