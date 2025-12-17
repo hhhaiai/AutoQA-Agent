@@ -36,14 +36,18 @@ function formatCauseSuffix(err: unknown): string {
 
 export async function runPreflight(options: PreflightOptions): Promise<PreflightResult> {
   try {
-    const browser = await createBrowser({
+    const { browser, persistentContext } = await createBrowser({
       headless: options.headless,
       slowMo: options.debug ? 75 : undefined,
     })
 
     const chromiumVersion = browser.version()
     const playwrightVersion = getPlaywrightVersion()
-    await browser.close()
+    if (persistentContext) {
+      await persistentContext.close()
+    } else {
+      await browser.close()
+    }
 
     return { ok: true, chromiumVersion, playwrightVersion }
   } catch (err: unknown) {

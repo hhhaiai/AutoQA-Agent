@@ -38,7 +38,7 @@ describe('runner/runSpecs (browser/context/page lifecycle)', () => {
       close: vi.fn(async () => {}),
     }
 
-    const createBrowserMock = vi.fn(async () => browser)
+    const createBrowserMock = vi.fn(async () => ({ browser }))
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
       createBrowser: createBrowserMock,
@@ -111,7 +111,7 @@ describe('runner/runSpecs (browser/context/page lifecycle)', () => {
       close: vi.fn(async () => {}),
     }
 
-    const createBrowserMock = vi.fn(async () => browser)
+    const createBrowserMock = vi.fn(async () => ({ browser }))
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
       createBrowser: createBrowserMock,
@@ -157,7 +157,7 @@ describe('runner/runSpecs (browser/context/page lifecycle)', () => {
       close: vi.fn(async () => {}),
     }
 
-    const createBrowserMock = vi.fn(async (_options: any) => browser)
+    const createBrowserMock = vi.fn(async (_options: any) => ({ browser }))
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
       createBrowser: createBrowserMock,
@@ -213,7 +213,7 @@ describe('runner/runSpecs (trace recording)', () => {
     }
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
-      createBrowser: vi.fn(async () => browser),
+      createBrowser: vi.fn(async () => ({ browser })),
     }))
 
     vi.doMock('../../src/runner/trace-paths.js', () => ({
@@ -283,7 +283,7 @@ describe('runner/runSpecs (trace recording)', () => {
     }
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
-      createBrowser: vi.fn(async () => browser),
+      createBrowser: vi.fn(async () => ({ browser })),
     }))
 
     vi.doMock('../../src/runner/trace-paths.js', () => ({
@@ -348,7 +348,7 @@ describe('runner/runSpecs (trace recording)', () => {
     }
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
-      createBrowser: vi.fn(async () => browser),
+      createBrowser: vi.fn(async () => ({ browser })),
     }))
 
     vi.doMock('../../src/runner/trace-paths.js', () => ({
@@ -415,7 +415,7 @@ describe('runner/runSpecs (trace recording)', () => {
     }
 
     vi.doMock('../../src/browser/create-browser.js', () => ({
-      createBrowser: vi.fn(async () => browser),
+      createBrowser: vi.fn(async () => ({ browser })),
     }))
 
     vi.doMock('../../src/runner/trace-paths.js', () => ({

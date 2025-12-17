@@ -162,14 +162,14 @@ async function safeTracingStop(context: BrowserContext, tracePath?: string): Pro
 }
 
 export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult> {
-  let browser: Awaited<ReturnType<typeof createBrowser>> | undefined
+  let browserResult: Awaited<ReturnType<typeof createBrowser>> | undefined
   const { logger, cwd } = options
   const traces: SpecTraceInfo[] = []
   const artifactMode = getArtifactMode()
   let failureScreenshotPath: string | undefined
 
   try {
-    browser = await createBrowser({
+    browserResult = await createBrowser({
       headless: options.headless,
       slowMo: options.debug ? 75 : undefined,
     })
@@ -190,6 +190,9 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
   let specsFailed = 0
 
   try {
+    const browser = browserResult.browser
+    const persistentContext = browserResult.persistentContext
+
     const chromiumVersion = options.debug ? browser.version() : undefined
     const playwrightVersion = options.debug ? getPlaywrightVersion() : undefined
 
@@ -211,18 +214,22 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
 
       let context: BrowserContext | undefined
       try {
-        context = await browser.newContext(
-          options.debug
-            ? {
-              viewport: null,
-            }
-            : {
-              viewport: {
-                width: 1440,
-                height: 900,
+        if (persistentContext) {
+          context = persistentContext
+        } else {
+          context = await browser.newContext(
+            options.debug
+              ? {
+                viewport: null,
+              }
+              : {
+                viewport: {
+                  width: 1440,
+                  height: 900,
+                },
               },
-            },
-        )
+          )
+        }
       } catch (err: unknown) {
         specsFailed++
         logger.log({
@@ -329,7 +336,9 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
           }
         }
 
-        await safeClose(context)
+        if (context && context !== persistentContext) {
+          await safeClose(context)
+        }
 
         if (!specFinishedLogged) {
           const ok = specOk ?? false
@@ -363,6 +372,10 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
       traces,
     }
   } finally {
-    await safeClose(browser)
+    if (browserResult?.persistentContext) {
+      await safeClose(browserResult.persistentContext)
+    } else {
+      await safeClose(browserResult?.browser)
+    }
   }
 }
