@@ -17,6 +17,18 @@ export type RunAgentOptions = {
   logger: Logger
 }
 
+export const RUN_AGENT_ALLOWED_TOOLS = [
+  'mcp__browser__snapshot',
+  'mcp__browser__navigate',
+  'mcp__browser__click',
+  'mcp__browser__fill',
+  'mcp__browser__select_option',
+  'mcp__browser__scroll',
+  'mcp__browser__wait',
+  'mcp__browser__assertTextPresent',
+  'mcp__browser__assertElementVisible',
+] as const
+
 function buildPrompt(input: Pick<RunAgentOptions, 'baseUrl' | 'specPath' | 'spec'>): string {
   const pre = input.spec.preconditions.map((p) => `- ${p}`).join('\n')
   const steps = input.spec.steps.map((s) => `${s.index}. ${s.text}`).join('\n')
@@ -33,7 +45,7 @@ Steps:
 ${steps}
 
 Rules:
-- Use ONLY the provided browser tools (snapshot/navigate/click/fill/select_option/scroll/wait).
+- Use ONLY the provided browser tools (snapshot/navigate/click/fill/select_option/scroll/wait/assertTextPresent/assertElementVisible).
 - Execute steps in order.
 - The browser page starts at about:blank. Always call navigate('/') first to open the site.
 - Tool inputs MUST be plain strings (do not include Markdown backticks or quotes around values).
@@ -130,15 +142,7 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
       mcpServers: {
         browser: server,
       },
-      allowedTools: [
-        'mcp__browser__snapshot',
-        'mcp__browser__navigate',
-        'mcp__browser__click',
-        'mcp__browser__fill',
-        'mcp__browser__select_option',
-        'mcp__browser__scroll',
-        'mcp__browser__wait',
-      ],
+      allowedTools: [...RUN_AGENT_ALLOWED_TOOLS],
       persistSession: false,
     },
   })

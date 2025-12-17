@@ -44,6 +44,17 @@ export function redactToolInput(toolName: string, input: Record<string, unknown>
       continue
     }
 
+    if (toolName === 'assertTextPresent' && key === 'text') {
+      result.textLength = typeof value === 'string' ? value.length : 0
+      continue
+    }
+
+    if (toolName === 'assertElementVisible' && (key === 'targetDescription' || key === 'ref')) {
+      const lengthKey = key === 'ref' ? 'refLength' : 'targetDescriptionLength'
+      result[lengthKey] = typeof value === 'string' ? value.length : 0
+      continue
+    }
+
     if (toolName === 'navigate' && key === 'url' && typeof value === 'string') {
       result[key] = redactUrlCredentials(value)
       continue

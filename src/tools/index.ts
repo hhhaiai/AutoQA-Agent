@@ -15,3 +15,9 @@ export type { ScrollData, ScrollInput } from './scroll.js'
 
 export { wait } from './wait.js'
 export type { WaitData, WaitInput } from './wait.js'
+
+export { assertTextPresent } from './assertions/assert-text-present.js'
+export type { AssertTextPresentData, AssertTextPresentInput } from './assertions/assert-text-present.js'
+
+export { assertElementVisible } from './assertions/assert-element-visible.js'
+export type { AssertElementVisibleData, AssertElementVisibleInput } from './assertions/assert-element-visible.js'

@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 import type { Locator, Page } from 'playwright'
 
-import { click, fill, navigate, scroll, wait } from '../tools/index.js'
+import { click, fill, navigate, scroll, wait, assertTextPresent, assertElementVisible } from '../tools/index.js'
 import { toToolError } from '../tools/playwright-error.js'
 import type { ContentBlock } from './pre-action-screenshot.js'
 import { runWithPreActionScreenshot } from './pre-action-screenshot.js'
@@ -288,7 +288,10 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
           const fileBaseName = nextFileBaseName('click')
           const startTime = Date.now()
           logToolCall('click', { targetDescription, ref })
-          writeDebug(options.debug, `mcp_tool=click target=${targetDescription}${ref ? ` ref=${ref}` : ''}`)
+          writeDebug(
+            options.debug,
+            `mcp_tool=click targetLength=${targetDescription.length}${ref ? ` refLength=${ref.length}` : ''}`,
+          )
 
           const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
 
@@ -361,7 +364,10 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
           const fileBaseName = nextFileBaseName('fill')
           const startTime = Date.now()
           logToolCall('fill', { targetDescription, ref, text })
-          writeDebug(options.debug, `mcp_tool=fill target=${targetDescription}${ref ? ` ref=${ref}` : ''} text_len=${text.length}`)
+          writeDebug(
+            options.debug,
+            `mcp_tool=fill targetLength=${targetDescription.length}${ref ? ` refLength=${ref.length}` : ''} textLength=${text.length}`,
+          )
 
           const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
 
@@ -585,6 +591,150 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
             : ({ captured: false } as SnapshotMeta)
 
           logToolResult('wait', startTime, result as any, { ...meta, snapshot: snapshotMeta })
+
+          const content: ContentBlock[] = []
+          if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
+          content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
+
+          return { content, isError: !result.ok }
+        },
+      ),
+      tool(
+        'assertTextPresent',
+        'Assert that the page contains the specified text. Returns ok=true if found, ok=false with ASSERTION_FAILED if not found.',
+        {
+          text: z.string(),
+        },
+        async (args) => {
+          const contextMode = getToolContextMode()
+          const text = normalizeToolStringInput(args.text)
+          const fileBaseName = nextFileBaseName('assertTextPresent')
+          const startTime = Date.now()
+          logToolCall('assertTextPresent', { text })
+          writeDebug(options.debug, `mcp_tool=assertTextPresent textLength=${text.length}`)
+
+          const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
+
+          const { result, meta } = await runWithPreActionScreenshot({
+            page: options.page,
+            runId: options.runId,
+            debug: options.debug,
+            cwd: options.cwd,
+            fileBaseName,
+            quality: DEFAULT_JPEG_QUALITY,
+            action: async () => {
+              await snapshotCapturePromise
+              return assertTextPresent({ page: options.page, text })
+            },
+          })
+
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = snapshotCapture
+            ? await writeSnapshotsIfNeeded(
+              snapshotCapture,
+              { cwd: options.cwd, runId: options.runId, fileBaseName },
+              shouldWriteArtifacts(options.debug, Boolean(result.ok)),
+            )
+            : ({ captured: false } as SnapshotMeta)
+
+          logToolResult('assertTextPresent', startTime, result as any, { ...meta, snapshot: snapshotMeta })
+
+          const content: ContentBlock[] = []
+          if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
+          if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
+          content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
+
+          return { content, isError: !result.ok }
+        },
+      ),
+      tool(
+        'assertElementVisible',
+        'Assert that an element described by targetDescription or ref is visible on the page. Returns ok=true if visible, ok=false with ASSERTION_FAILED if not visible.',
+        {
+          targetDescription: z.string().optional(),
+          ref: z.string().optional(),
+        },
+        async (args) => {
+          const contextMode = getToolContextMode()
+          const targetDescription = typeof (args as any).targetDescription === 'string' ? normalizeToolStringInput((args as any).targetDescription) : ''
+          const ref = typeof (args as any).ref === 'string' ? normalizeToolStringInput((args as any).ref) : ''
+          const fileBaseName = nextFileBaseName('assertElementVisible')
+          const startTime = Date.now()
+          logToolCall('assertElementVisible', { targetDescription, ref })
+          writeDebug(
+            options.debug,
+            `mcp_tool=assertElementVisible targetLength=${targetDescription.length}${ref ? ` refLength=${ref.length}` : ''}`,
+          )
+
+          const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
+
+          const { result, meta } = await runWithPreActionScreenshot({
+            page: options.page,
+            runId: options.runId,
+            debug: options.debug,
+            cwd: options.cwd,
+            fileBaseName,
+            quality: DEFAULT_JPEG_QUALITY,
+            action: async () => {
+              await snapshotCapturePromise
+              if (!ref && !targetDescription) {
+                return {
+                  ok: false as const,
+                  error: {
+                    code: 'INVALID_INPUT' as const,
+                    message: 'Either ref or targetDescription is required',
+                    retriable: false,
+                    cause: undefined,
+                  },
+                }
+              }
+              if (ref) {
+                try {
+                  const locator = await resolveRefLocator(ref)
+                  const count = await locator.count()
+                  if (count <= 0) {
+                    return {
+                      ok: false as const,
+                      error: {
+                        code: 'ASSERTION_FAILED' as const,
+                        message: `Ref not found or not visible: ${ref}`,
+                        retriable: true,
+                        cause: undefined,
+                      },
+                    }
+                  }
+                  const isVisible = await locator.isVisible()
+                  if (isVisible) {
+                    return { ok: true as const, data: { ref, targetDescription } }
+                  }
+                  return {
+                    ok: false as const,
+                    error: {
+                      code: 'ASSERTION_FAILED' as const,
+                      message: `Element with ref not visible: ${ref}`,
+                      retriable: true,
+                      cause: undefined,
+                    },
+                  }
+                } catch (err: unknown) {
+                  return { ok: false as const, error: toToolError(err, { defaultCode: 'ASSERTION_FAILED' }) }
+                }
+              }
+              return assertElementVisible({ page: options.page, targetDescription })
+            },
+          })
+
+          const snapshotCapture = await snapshotCapturePromise
+          const snapshotMeta = snapshotCapture
+            ? await writeSnapshotsIfNeeded(
+              snapshotCapture,
+              { cwd: options.cwd, runId: options.runId, fileBaseName },
+              shouldWriteArtifacts(options.debug, Boolean(result.ok)),
+            )
+            : ({ captured: false } as SnapshotMeta)
+
+          logToolResult('assertElementVisible', startTime, result as any, { ...meta, snapshot: snapshotMeta })
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })

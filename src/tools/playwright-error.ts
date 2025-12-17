@@ -6,6 +6,7 @@ export type ToolErrorCode =
   | 'TIMEOUT'
   | 'NAVIGATION_FAILED'
   | 'PLAYWRIGHT_ERROR'
+  | 'ASSERTION_FAILED'
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error && typeof err.message === 'string') return err.message
@@ -19,7 +20,7 @@ function getErrorName(err: unknown): string | undefined {
   return typeof anyErr.name === 'string' ? anyErr.name : undefined
 }
 
-function isTimeoutError(err: unknown): boolean {
+export function isTimeoutError(err: unknown): boolean {
   const name = getErrorName(err)
   if (name === 'TimeoutError') return true
   const msg = getErrorMessage(err).toLowerCase()
@@ -43,7 +44,7 @@ function toCauseString(err: unknown): string | undefined {
 export function toToolError(err: unknown, options?: { defaultCode?: ToolErrorCode }): ToolError {
   const code: ToolErrorCode = isTimeoutError(err) ? 'TIMEOUT' : (options?.defaultCode ?? 'PLAYWRIGHT_ERROR')
 
-  const retriable = code === 'TIMEOUT' || code === 'NAVIGATION_FAILED' || code === 'PLAYWRIGHT_ERROR'
+  const retriable = code === 'TIMEOUT' || code === 'NAVIGATION_FAILED' || code === 'PLAYWRIGHT_ERROR' || code === 'ASSERTION_FAILED'
 
   return {
     code,
