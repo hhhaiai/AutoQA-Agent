@@ -98,7 +98,9 @@ flowchart TD
     B --> C["Claude Agent SDK<br/>ReAct 循环执行"]
     C --> D["MCP 浏览器工具<br/>snapshot/navigate/click/fill"]
     D --> E["Playwright 引擎<br/>实际浏览器操作"]
-    E --> F["执行结果<br/>截图/日志/Trace"]
+    E --> F["运行产物<br/>截图/快照/日志/Trace"]
+    E --> G["动作 IR<br/>.autoqa/runs/<runId>/ir.jsonl"]
+    G --> H["导出代码<br/>tests/autoqa/*.spec.ts"]
 
     style A fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
     style B fill:#f3e5f5,stroke:#9c27b0,color:#4a148c
@@ -106,6 +108,8 @@ flowchart TD
     style D fill:#fff3e0,stroke:#ff9800,color:#e65100
     style E fill:#e8f5e9,stroke:#4caf50,color:#1b5e20
     style F fill:#fce4ec,stroke:#e91e63,color:#880e4f
+    style G fill:#f1f8e9,stroke:#7cb342,color:#33691e
+    style H fill:#e0f7fa,stroke:#00acc1,color:#004d40
 ```
 
 ### 执行流程
@@ -113,7 +117,9 @@ flowchart TD
 1. **Markdown 解析**：提取前置条件和测试步骤
 2. **Agent 执行**：Claude Agent SDK 管理"观察-思考-行动"循环
 3. **智能定位**：优先使用稳定的 ref 引用，失败时回退到语义描述
-4. **结果收集**：自动记录截图、快照和执行日志
+4. **断言与自愈**：对 Verify/Assert 步骤执行断言工具；失败时回流错误上下文触发重试，并受护栏限制
+5. **结果收集**：自动记录截图、快照、Trace 与结构化日志
+6. **沉淀与导出**：记录动作 IR，并在 spec 成功后自动导出 `@playwright/test` 用例到 `tests/autoqa/`
 
 ## 已实现功能
 
