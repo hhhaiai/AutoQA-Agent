@@ -13,7 +13,7 @@ import { runWithPreActionScreenshot } from './pre-action-screenshot.js'
 import type { Logger } from '../logging/index.js'
 import { redactToolInput, sanitizeRelativePath } from '../logging/index.js'
 import { captureSnapshots, writeSnapshotsIfNeeded, type SnapshotMeta } from '../browser/snapshot.js'
-import { createIRRecorder, nullRecorder, type IRRecorder, type PreActionResult, type IRToolName } from '../ir/index.js'
+import { createIRRecorder, nullRecorder, extractFingerprint, type ElementFingerprint, type IRRecorder, type PreActionResult, type IRToolName } from '../ir/index.js'
 
 type ArtifactMode = 'all' | 'fail' | 'none'
 type ToolContextMode = 'screenshot' | 'snapshot' | 'none'
@@ -59,6 +59,58 @@ function safeStringify(value: unknown): string {
 
 function isValidSnapshotRef(ref: string): boolean {
   return /^e\d+$/.test(ref)
+}
+
+const TARGET_MATCH_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'the',
+  'with',
+  'for',
+  'to',
+  'in',
+  'on',
+  'of',
+  'and',
+  'or',
+  'button',
+  'link',
+  'element',
+  'item',
+])
+
+function normalizeTargetTokens(value: string): string[] {
+  return (value ?? '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0 && !TARGET_MATCH_STOP_WORDS.has(t))
+}
+
+function fingerprintToSearchText(fp: ElementFingerprint | null | undefined): string {
+  if (!fp) return ''
+  return [
+    fp.accessibleName,
+    fp.ariaLabel,
+    fp.textSnippet,
+    fp.id,
+    fp.testId,
+    fp.nameAttr,
+    fp.placeholder,
+    fp.role,
+    fp.tagName,
+  ]
+    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+    .join(' ')
+    .toLowerCase()
+}
+
+function fingerprintMatchesTargetDescription(fp: ElementFingerprint | null | undefined, targetDescription: string): boolean {
+  const tokens = normalizeTargetTokens(targetDescription)
+  if (tokens.length === 0) return true
+  const haystack = fingerprintToSearchText(fp)
+  if (!haystack) return true
+  return tokens.some((t) => haystack.includes(t))
 }
 
 function writeDebug(enabled: boolean, line: string): void {
@@ -231,6 +283,13 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
   }
 
   async function resolveRefLocator(ref: string): Promise<Locator> {
+    const direct = options.page.locator(`aria-ref=${ref}`).first()
+    try {
+      const count = await direct.count()
+      if (count > 0) return direct
+    } catch {
+    }
+
     try {
       const snapshotForAI = (options.page as any)?._snapshotForAI
       if (typeof snapshotForAI === 'function') {
@@ -238,6 +297,7 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
       }
     } catch {
     }
+
     return options.page.locator(`aria-ref=${ref}`).first()
   }
 
@@ -323,7 +383,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -481,7 +540,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -661,7 +719,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -768,7 +825,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -819,7 +875,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -869,7 +924,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -949,7 +1003,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 
@@ -1041,6 +1094,49 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
                   const isVisible = await locator.isVisible()
                   if (isVisible) {
+                    if (targetDescription) {
+                      let fp: ElementFingerprint | null | undefined = irPreActionResult?.fingerprint
+                      if (!fp) {
+                        try {
+                          const handle = await locator.elementHandle({ timeout: 2000 })
+                          if (handle) {
+                            fp = await extractFingerprint(handle)
+                            await handle.dispose()
+                          }
+                        } catch {
+                          fp = undefined
+                        }
+                      }
+
+                      if (!fingerprintMatchesTargetDescription(fp, targetDescription)) {
+                        try {
+                          const fallbackLocator = await resolveVisibleElement(options.page, targetDescription)
+                          if (fallbackLocator) {
+                            if (irRecorder.isEnabled()) {
+                              irPreActionResult = await irRecorder.prepareForAction(
+                                options.page,
+                                'assertElementVisible',
+                                fallbackLocator,
+                              )
+                            }
+
+                            return { ok: true as const, data: { ref, targetDescription } }
+                          }
+                        } catch {
+                        }
+
+                        const fpText = fingerprintToSearchText(fp)
+                        return {
+                          ok: false as const,
+                          error: {
+                            code: 'ASSERTION_FAILED' as const,
+                            message: `Ref resolved but does not match targetDescription: ref=${ref} targetDescription="${targetDescription}" fingerprint="${fpText.slice(0, 80)}"`,
+                            retriable: true,
+                            cause: undefined,
+                          },
+                        }
+                      }
+                    }
                     return { ok: true as const, data: { ref, targetDescription } }
                   }
                   return {
@@ -1106,7 +1202,6 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
 
           const content: ContentBlock[] = []
           if (meta.error) content.push({ type: 'text', text: `SCREENSHOT_FAILED: ${meta.error}` })
-          if (!result.ok && meta.imageBlock) content.push(meta.imageBlock)
           if (snapshotMeta.error) content.push({ type: 'text', text: `SNAPSHOT_FAILED: ${snapshotMeta.error}` })
           content.push({ type: 'text', text: safeStringify(summarizeToolResult(result as any)) })
 

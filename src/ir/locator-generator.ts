@@ -35,6 +35,15 @@ export function generateLocatorCandidates(fingerprint: ElementFingerprint): Loca
       code: `page.getByTestId('${escapeJsString(fingerprint.testId)}')`,
       validation: { unique: false },
     })
+
+    for (const attr of ['data-testid', 'data-test-id', 'data-test']) {
+      candidates.push({
+        kind: 'cssAttr',
+        value: `${attr}=${fingerprint.testId}`,
+        code: `page.locator('[${attr}="${escapeCssString(fingerprint.testId)}"]')`,
+        validation: { unique: false },
+      })
+    }
   }
 
   if (fingerprint.role && fingerprint.accessibleName) {

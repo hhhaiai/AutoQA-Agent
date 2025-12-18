@@ -212,4 +212,92 @@ describe('runAgent guardrails (integration with query stream)', () => {
       }),
     ).rejects.not.toMatchObject({ code: 'GUARDRAIL_MAX_RETRIES_PER_STEP' })
   })
+
+  it('does not fail spec when assertElementVisible was never attempted (allows weaker assertions)', async () => {
+    const messages: any[] = [
+      {
+        type: 'assistant',
+        content: [{ type: 'tool_use', id: 't1', name: 'mcp__browser__assertTextPresent', input: { stepIndex: 7 } }],
+      },
+      {
+        type: 'user',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false, content: 'ok' }],
+        },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+      },
+    ]
+
+    mockQuery.mockReturnValue(createAsyncIterable(messages))
+
+    await expect(
+      runAgent({
+        runId: 'run-icon-1',
+        baseUrl: 'http://example.test',
+        debug: false,
+        specPath: '/specs/a.md',
+        spec: { preconditions: [], steps: [] },
+        page: {} as any,
+        logger: loggerMock,
+        guardrails: {
+          maxToolCallsPerSpec: 100,
+          maxConsecutiveErrors: 100,
+          maxRetriesPerStep: 100,
+        },
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('fails spec when assertElementVisible is attempted but never succeeds (prevents downgrade false positives)', async () => {
+    const messages: any[] = [
+      {
+        type: 'assistant',
+        content: [{ type: 'tool_use', id: 't1', name: 'mcp__browser__assertElementVisible', input: { stepIndex: 7 } }],
+      },
+      {
+        type: 'user',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 't1', is_error: true, content: 'fail' }],
+        },
+      },
+      {
+        type: 'assistant',
+        content: [{ type: 'tool_use', id: 't2', name: 'mcp__browser__assertTextPresent', input: { stepIndex: 7 } }],
+      },
+      {
+        type: 'user',
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 't2', is_error: false, content: 'ok' }],
+        },
+      },
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: false,
+      },
+    ]
+
+    mockQuery.mockReturnValue(createAsyncIterable(messages))
+
+    await expect(
+      runAgent({
+        runId: 'run-icon-2',
+        baseUrl: 'http://example.test',
+        debug: false,
+        specPath: '/specs/a.md',
+        spec: { preconditions: [], steps: [] },
+        page: {} as any,
+        logger: loggerMock,
+        guardrails: {
+          maxToolCallsPerSpec: 100,
+          maxConsecutiveErrors: 100,
+          maxRetriesPerStep: 100,
+        },
+      }),
+    ).rejects.toThrow(/STEP_VALIDATION_FAILED: stepIndex=7 attempted mcp__browser__assertElementVisible but never succeeded/)
+  })
 })

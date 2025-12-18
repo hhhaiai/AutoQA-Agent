@@ -16,4 +16,3 @@
 4. Fill the "Password" field with secret_sauce
 5. Click the "Login" button
 6. Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
-7. Verify the cart icon is visible

@@ -81,7 +81,7 @@ describe('agent/mcp error mapping', () => {
     )
   })
 
-  it('sets isError=true, includes error.code, and injects image block on failure', async () => {
+  it('sets isError=true and includes error.code on failure (no image blocks)', async () => {
     await withEnv(
       {
         AUTOQA_ARTIFACTS: 'none',
@@ -122,13 +122,117 @@ describe('agent/mcp error mapping', () => {
         expect(out.isError).toBe(true)
 
         const hasImage = (out.content ?? []).some((b: any) => b && typeof b === 'object' && b.type === 'image')
-        expect(hasImage).toBe(true)
+        expect(hasImage).toBe(false)
 
         const summaryText = extractSummaryText(out)
         const summary = JSON.parse(summaryText)
 
         expect(summary.ok).toBe(false)
         expect(summary.error.code).toBe('ELEMENT_NOT_FOUND')
+      },
+    )
+  })
+
+  it('does not call _snapshotForAI when aria-ref already resolves (prevents ref remap)', async () => {
+    await withEnv(
+      {
+        AUTOQA_ARTIFACTS: 'none',
+        AUTOQA_TOOL_CONTEXT: 'screenshot',
+      },
+      async () => {
+        const buffer = Buffer.from('jpeg-bytes')
+
+        const snapshotForAI = vi.fn(async () => ({}))
+
+        const locator: any = {
+          first: vi.fn(() => locator),
+          count: vi.fn(async () => 1),
+          click: vi.fn(async () => {}),
+        }
+
+        const page: any = {
+          screenshot: vi.fn(async () => buffer),
+          viewportSize: vi.fn(() => ({ width: 1024, height: 768 })),
+          locator: vi.fn((selector: string) => {
+            expect(selector).toBe('aria-ref=e34')
+            return locator
+          }),
+          _snapshotForAI: snapshotForAI,
+        }
+
+        const server = createBrowserToolsMcpServer({
+          page,
+          baseUrl: 'http://example.test',
+          runId: 'run-3',
+          debug: false,
+          cwd: '/tmp/test-cwd',
+          specPath: '/specs/a.md',
+          logger: mockLogger,
+          enableIR: false,
+        })
+
+        const mcp = (server as any).instance as any
+        const clickTool = mcp._registeredTools?.click
+        expect(clickTool).toBeTruthy()
+
+        const out = await clickTool.callback({ ref: 'e34' }, {})
+
+        expect(out.isError).toBe(false)
+        expect(snapshotForAI).not.toHaveBeenCalled()
+      },
+    )
+  })
+
+  it('calls _snapshotForAI only as fallback when aria-ref is missing', async () => {
+    await withEnv(
+      {
+        AUTOQA_ARTIFACTS: 'none',
+        AUTOQA_TOOL_CONTEXT: 'screenshot',
+      },
+      async () => {
+        const buffer = Buffer.from('jpeg-bytes')
+
+        let refreshed = false
+        const snapshotForAI = vi.fn(async () => {
+          refreshed = true
+          return {}
+        })
+
+        const locator: any = {
+          first: vi.fn(() => locator),
+          count: vi.fn(async () => (refreshed ? 1 : 0)),
+          click: vi.fn(async () => {}),
+        }
+
+        const page: any = {
+          screenshot: vi.fn(async () => buffer),
+          viewportSize: vi.fn(() => ({ width: 1024, height: 768 })),
+          locator: vi.fn((selector: string) => {
+            expect(selector).toBe('aria-ref=e99')
+            return locator
+          }),
+          _snapshotForAI: snapshotForAI,
+        }
+
+        const server = createBrowserToolsMcpServer({
+          page,
+          baseUrl: 'http://example.test',
+          runId: 'run-4',
+          debug: false,
+          cwd: '/tmp/test-cwd',
+          specPath: '/specs/a.md',
+          logger: mockLogger,
+          enableIR: false,
+        })
+
+        const mcp = (server as any).instance as any
+        const clickTool = mcp._registeredTools?.click
+        expect(clickTool).toBeTruthy()
+
+        const out = await clickTool.callback({ ref: 'e99' }, {})
+
+        expect(out.isError).toBe(false)
+        expect(snapshotForAI).toHaveBeenCalledTimes(1)
       },
     )
   })

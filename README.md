@@ -10,7 +10,7 @@
 
 基于 Claude Agent SDK + Playwright 的"文档即测试"（Docs-as-Tests）自动化验收测试 CLI 工具。
 
-> **当前状态**：Epic 1/2 的执行闭环已完成，示例用例可以稳定运行。断言/自愈护栏与"导出 Playwright Test"功能正在开发中。
+> **当前状态**：Epic 1-4 的核心能力已实现：`autoqa init` 初始化、`autoqa run` 执行闭环、断言 + 自愈护栏、动作 IR 记录与自动导出 `@playwright/test` 用例。
 
 ## 📖 目录
 
@@ -46,7 +46,7 @@ AutoQA-Agent 是一个创新的自动化测试工具，让 QA 和产品经理能
 
 - Node.js >= 20
 - npm 或 yarn
-- Anthropic API Key
+- Claude Code 已授权（推荐）或设置 `ANTHROPIC_API_KEY`
 
 ### 安装
 
@@ -73,23 +73,21 @@ autoqa init
 
 # 这将创建：
 # - autoqa.config.json - 配置文件
-# - specs/ - 测试用例目录（含示例）
+# - specs/ - 测试用例目录
+# - specs/login-example.md - 示例 Markdown 用例（如果不存在则创建）
 ```
 
 ### 运行第一个测试
 
 ```bash
-# 运行单个测试
-autoqa run specs/login-example.md
+# 运行单个测试（仓库自带示例）
+autoqa run specs/saucedemo-01-login.md --url https://www.saucedemo.com/
 
 # 运行目录下所有测试
-autoqa run specs/
-
-# 指定基础 URL
 autoqa run specs/ --url https://www.saucedemo.com/
 
 # 调试模式（显示浏览器界面）
-autoqa run specs/ --debug
+autoqa run specs/saucedemo-01-login.md --url https://www.saucedemo.com/ --debug
 ```
 
 ## 工作原理
@@ -122,7 +120,7 @@ flowchart TD
 ### CLI 命令
 
 - **`autoqa init`** - 初始化项目配置
-- **`autoqa run <path>`** - 执行测试用例
+- **`autoqa run <path> --url <baseUrl>`** - 执行测试用例（`--url` 必填）
 - **`autoqa run --debug`** - 调试模式运行
 - **`autoqa run --headless`** - 无头模式运行（默认）
 
@@ -137,6 +135,8 @@ flowchart TD
 | `select_option` | 选择下拉选项 | ref, label |
 | `scroll` | 滚动页面 | direction, amount |
 | `wait` | 显式等待 | seconds |
+| `assertTextPresent` | 断言页面包含指定文本且至少有一个可见匹配 | text |
+| `assertElementVisible` | 断言目标元素可见（支持语义描述解析） | targetDescription |
 
 ## 使用指南
 
@@ -163,6 +163,8 @@ flowchart TD
 6. Verify the user is redirected to dashboard
 ```
 
+说明：当前版本 Base URL 由 `autoqa run --url <baseUrl>` 提供；`## Preconditions` 中的 Base URL 仅用于可读性，不参与解析。
+
 ### 断言语句
 
 使用以下开头的步骤会被识别为断言：
@@ -184,37 +186,45 @@ flowchart TD
 ```json
 {
   "schemaVersion": 1,
-  "defaults": {
-    "baseUrl": "https://example.com",
-    "timeout": 30000,
-    "headless": true
-  },
-  "artifacts": {
-    "screenshots": true,
-    "snapshots": true,
-    "traces": true
+  "guardrails": {
+    "maxToolCallsPerSpec": 200,
+    "maxConsecutiveErrors": 8,
+    "maxRetriesPerStep": 5
   }
 }
 ```
+
+说明：
+
+- `autoqa init` 会在当前目录生成该文件。
+- `autoqa run` 也支持在未生成配置文件的情况下运行（会使用内置默认值），但仍需要通过 `--url` 提供 Base URL。
 
 ### 环境变量
 
 | 变量名 | 描述 | 默认值 |
 |--------|------|--------|
 | `ANTHROPIC_API_KEY` | Claude API 密钥 | - |
-| `AUTOQA_ARTIFACTS` | 产物目录路径 | `.autoqa/runs` |
-| `AUTOQA_TOOL_CONTEXT` | 工具上下文级别 | `info` |
+| `AUTOQA_ARTIFACTS` | 产物落盘策略：`all` / `fail` / `none` | `fail` |
+| `AUTOQA_TOOL_CONTEXT` | 工具调用时注入给 Agent 的上下文：`screenshot` / `snapshot` / `none` | `screenshot` |
+| `AUTOQA_PREFLIGHT_NAVIGATE` | 运行前是否先 `page.goto(baseUrl)` 进行预热：`1` 开启 | - |
 
 ## 运行产物
 
-执行完成后，测试产物保存在 `.autoqa/runs/<runId>/` 目录：
+执行完成后，测试产物与导出结果主要包含：
 
 ```
 .autoqa/runs/2024-01-01T12-00-00/
 ├── run.log.jsonl    # 结构化执行日志
-├── screenshots/     # 页面截图
-├── snapshots/       # 可访问性快照
-└── traces/          # Playwright Trace 文件
+├── ir.jsonl         # 动作 IR（用于导出 Playwright Test）
+├── screenshots/     # 页面截图（依赖 AUTOQA_ARTIFACTS）
+├── snapshots/       # 可访问性快照（依赖 AUTOQA_ARTIFACTS）
+└── traces/          # Playwright Trace（依赖 AUTOQA_ARTIFACTS）
+```
+
+此外，成功跑通的 spec 会自动导出 `@playwright/test` 用例到：
+
+```
+tests/autoqa/*.spec.ts
 ```
 
 ## 开发指南
@@ -223,12 +233,16 @@ flowchart TD
 
 ```
 src/
-├── cli.ts           # CLI 入口
-├── runner/          # 测试运行器
-├── agent/           # Agent 相关
-├── tools/           # 浏览器工具
-├── markdown/        # Markdown 解析
-└── specs/           # 测试发现
+├── agent/           # Claude Agent SDK 集成、护栏
+├── auth/            # 授权探测
+├── browser/         # screenshot/snapshot
+├── cli/             # CLI 参数解析与命令路由
+├── config/          # autoqa.config.json 读取与校验
+├── ir/              # 动作 IR、locator 候选与导出依赖的数据结构
+├── markdown/        # Markdown spec 解析
+├── runner/          # spec 生命周期、trace/导出编排
+├── specs/           # spec 发现
+└── tools/           # Playwright adapters + assertions
 ```
 
 ### 构建和测试
@@ -246,18 +260,18 @@ npm run build
 
 ## 路线图
 
-### Epic 3：验收判定与自愈闭环
+### 已完成（Epic）
 
-- [ ] 断言工具实现
-- [ ] 失败重试机制
-- [ ] 执行护栏和限制
-- [ ] CI/CD 友好的错误报告
+- [x] Epic 1：零配置上手（项目初始化）
+- [x] Epic 2：执行闭环（从 Markdown 驱动浏览器完成流程）
+- [x] Epic 3：验收判定与自愈闭环（断言 + 失败重试 + 护栏）
+- [x] Epic 4：沉淀与导出（动作 IR + 自动导出 Playwright Test）
 
-### Epic 4：导出 Playwright Test
+### Backlog（可选方向）
 
-- [ ] 动作 IR 记录
-- [ ] 稳定定位符生成
-- [ ] 自动导出 @playwright/test 兼容代码
+- [ ] 丰富导出能力（更多语义步骤解析与更完整的断言映射）
+- [ ] 增加更多示例 specs 与端到端演示项目
+- [ ] 文档与架构图持续完善
 
 ## Star History
 

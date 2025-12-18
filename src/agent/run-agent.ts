@@ -72,6 +72,11 @@ Rules:
   - Only if ref-based action is not possible, fall back to using targetDescription.
   - NEVER guess or invent a ref. A ref must be exactly like e15 and must be copied from a snapshot in this run.
   - For icon-only UI (e.g. the cart icon in the top-right on SauceDemo inventory page), prefer stable attribute-based targetDescription instead of ref, e.g. data-test=shopping-cart-link or class=shopping_cart_link.
+- Assertion requirement (CRITICAL):
+  - For EVERY step that starts with "Verify" or contains verification/assertion intent, you MUST call at least one assertion tool (assertTextPresent or assertElementVisible) with the correct stepIndex.
+  - Do NOT skip assertion tool calls even if you can visually confirm the result from a snapshot. The assertion tool call is required for test recording.
+  - For sorting/ordering verification, assert that a specific expected text (e.g. the first product name or price after sorting) is present on the page.
+  - Example: To verify "sorted by price ascending", call assertTextPresent with the expected lowest price like "$7.99".
 `
 }
 
@@ -92,6 +97,21 @@ function safeString(value: unknown): string {
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value
   return `${value.slice(0, max)}…`
+}
+
+const NO_DOWNGRADE_TOOLS = new Set(['mcp__browser__assertElementVisible'])
+
+type StepToolStats = {
+  attemptedTools: Set<string>
+  okTools: Set<string>
+}
+
+function ensureStepStats(map: Map<number, StepToolStats>, stepIndex: number): StepToolStats {
+  const existing = map.get(stepIndex)
+  if (existing) return existing
+  const created: StepToolStats = { attemptedTools: new Set(), okTools: new Set() }
+  map.set(stepIndex, created)
+  return created
 }
 
 function parseStepIndex(value: unknown): number | null {
@@ -147,7 +167,8 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
   }
 
   const counters: GuardrailCounters = createGuardrailCounters()
-  const toolUseStepIndex = new Map<string, number | null>()
+  const toolUseMeta = new Map<string, { stepIndex: number | null; toolName: string }>()
+  const stepToolStats = new Map<number, StepToolStats>()
 
   const server = createBrowserToolsMcpServer({
     page: options.page,
@@ -242,7 +263,12 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
 
               updateCountersOnToolCall(counters)
               const stepIndex = parseStepIndex((input as any)?.stepIndex)
-              if (id) toolUseStepIndex.set(id, stepIndex)
+              if (id) toolUseMeta.set(id, { stepIndex, toolName: name })
+
+              if (stepIndex != null && name) {
+                const stats = ensureStepStats(stepToolStats, stepIndex)
+                stats.attemptedTools.add(name)
+              }
 
               const violation = checkGuardrails(counters, guardrailLimits, stepIndex)
               if (violation) {
@@ -284,8 +310,15 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
               const isError = Boolean(block?.is_error)
               const text = safeString(block?.content)
 
-              const stepIndex = toolUseId ? (toolUseStepIndex.get(toolUseId) ?? null) : null
-              if (toolUseId) toolUseStepIndex.delete(toolUseId)
+              const meta = toolUseId ? toolUseMeta.get(toolUseId) : undefined
+              const stepIndex = meta?.stepIndex ?? null
+              const toolName = meta?.toolName ?? ''
+              if (toolUseId) toolUseMeta.delete(toolUseId)
+
+              if (!isError && stepIndex != null && toolName) {
+                const stats = ensureStepStats(stepToolStats, stepIndex)
+                stats.okTools.add(toolName)
+              }
               updateCountersOnToolResult(counters, stepIndex, isError)
 
               const violation = checkGuardrails(counters, guardrailLimits, stepIndex)
@@ -326,6 +359,14 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
           if (message?.is_error) {
             const errors = Array.isArray(message?.errors) ? message.errors.join('\n') : undefined
             throw new Error(errors && errors.length > 0 ? errors : 'Agent run failed')
+          }
+
+          for (const [stepIndex, stats] of stepToolStats.entries()) {
+            for (const toolName of NO_DOWNGRADE_TOOLS) {
+              if (!stats.attemptedTools.has(toolName)) continue
+              if (stats.okTools.has(toolName)) continue
+              throw new Error(`STEP_VALIDATION_FAILED: stepIndex=${stepIndex} attempted ${toolName} but never succeeded`)
+            }
           }
           return
         }

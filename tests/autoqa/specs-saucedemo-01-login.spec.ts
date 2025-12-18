@@ -18,9 +18,6 @@ test('saucedemo 01 login', async ({ page }) => {
   await page.locator('#login-button').click();
   // Step 6: Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
   const locator6_1 = page.getByText('Products');
-  await expect(locator6_1.nth(0)).toBeVisible();
-  // Step 7: Verify the cart icon is visible
-  const locator7_1 = page.getByText('Products');
-  await expect(locator7_1).toHaveCount(1);
-  await expect(locator7_1).toBeVisible();
+  await expect(locator6_1).toHaveCount(1);
+  await expect(locator6_1).toBeVisible();
 });

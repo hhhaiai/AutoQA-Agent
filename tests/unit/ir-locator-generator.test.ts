@@ -23,6 +23,19 @@ describe('Locator Generator', () => {
       expect(testIdCandidate?.code).toBe("page.getByTestId('login-button')")
     })
 
+    it('should generate cssAttr candidates for data-testid/data-test-id/data-test when testId exists', () => {
+      const fingerprint: ElementFingerprint = {
+        testId: 'product-sort-container',
+        tagName: 'select',
+      }
+      const candidates = generateLocatorCandidates(fingerprint)
+
+      const cssAttrCandidates = candidates.filter((c) => c.kind === 'cssAttr')
+      expect(cssAttrCandidates.some((c) => c.value === 'data-testid=product-sort-container')).toBe(true)
+      expect(cssAttrCandidates.some((c) => c.value === 'data-test-id=product-sort-container')).toBe(true)
+      expect(cssAttrCandidates.some((c) => c.value === 'data-test=product-sort-container')).toBe(true)
+    })
+
     it('should generate getByRole candidate when role and accessibleName exist', () => {
       const fingerprint: ElementFingerprint = {
         role: 'button',
