@@ -35,27 +35,37 @@ export function sanitizeOriginOnly(url: string): string {
 
 export type RedactedToolInput = Record<string, unknown>
 
+function normalizeToolName(toolName: string): string {
+  if (toolName.startsWith('mcp__')) {
+    const parts = toolName.split('__').filter((p) => p.length > 0)
+    const last = parts[parts.length - 1]
+    if (last) return last
+  }
+  return toolName
+}
+
 export function redactToolInput(toolName: string, input: Record<string, unknown>): RedactedToolInput {
+  const normalizedToolName = normalizeToolName(toolName)
   const result: RedactedToolInput = {}
 
   for (const [key, value] of Object.entries(input)) {
-    if (toolName === 'fill' && key === 'text') {
+    if (normalizedToolName === 'fill' && key === 'text') {
       result.textLength = typeof value === 'string' ? value.length : 0
       continue
     }
 
-    if (toolName === 'assertTextPresent' && key === 'text') {
+    if (normalizedToolName === 'assertTextPresent' && key === 'text') {
       result.textLength = typeof value === 'string' ? value.length : 0
       continue
     }
 
-    if (toolName === 'assertElementVisible' && (key === 'targetDescription' || key === 'ref')) {
+    if (normalizedToolName === 'assertElementVisible' && (key === 'targetDescription' || key === 'ref')) {
       const lengthKey = key === 'ref' ? 'refLength' : 'targetDescriptionLength'
       result[lengthKey] = typeof value === 'string' ? value.length : 0
       continue
     }
 
-    if (toolName === 'navigate' && key === 'url' && typeof value === 'string') {
+    if (normalizedToolName === 'navigate' && key === 'url' && typeof value === 'string') {
       result[key] = redactUrlCredentials(value)
       continue
     }

@@ -49,7 +49,6 @@ describe('autoqa run (args & spec discovery)', () => {
         },
         writeErr: () => {},
       })
-
       await program.parseAsync(['run', specsDir, '--url', 'http://example.test'], { from: 'user' })
 
       const lines = stdout.trim().split('\n')
@@ -63,6 +62,56 @@ describe('autoqa run (args & spec discovery)', () => {
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('exits with code 2 when spec uses USERNAME but AUTOQA_USERNAME is missing', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'autoqa-run-'))
+    const originalCwd = process.cwd()
+    const originalUsername = process.env.AUTOQA_USERNAME
+
+    let errOutput = ''
+
+    try {
+      const specPath = join(tempDir, 'single.md')
+      writeFileSync(
+        specPath,
+        `# single\n\n## Preconditions\n- ok\n\n## Steps\n1. Fill the \"Username\" field with {{USERNAME}}\n`,
+        'utf8',
+      )
+
+      process.chdir(tempDir)
+      delete process.env.AUTOQA_USERNAME
+
+      const { createProgram } = await import('../../src/cli/program.js')
+      const program = createProgram()
+      program.configureOutput({
+        writeOut: () => {},
+        writeErr: (str: string) => {
+          errOutput += str
+        },
+      })
+      program.exitOverride()
+
+      let exitCode: number | undefined
+
+      try {
+        await program.parseAsync(['run', specPath, '--url', 'http://example.test'], { from: 'user' })
+      } catch (err: any) {
+        exitCode = err.exitCode
+      }
+
+      expect(exitCode).toBe(2)
+      expect(errOutput).toContain('Invalid spec template')
+      expect(errOutput).toContain('Missing template variables')
+      expect(errOutput).toContain('USERNAME')
+      expect(runSpecsMock).not.toHaveBeenCalled()
+    } finally {
+      process.chdir(originalCwd)
+      rmSync(tempDir, { recursive: true, force: true })
+      if (originalUsername !== undefined) {
+        process.env.AUTOQA_USERNAME = originalUsername
+      }
     }
   })
 
@@ -346,8 +395,11 @@ describe('autoqa run (args & spec discovery)', () => {
   it('exits with code 2 when --url is missing', async () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'autoqa-run-'))
     const originalCwd = process.cwd()
+    const originalBaseUrl = process.env.AUTOQA_BASE_URL
 
     try {
+      delete process.env.AUTOQA_BASE_URL
+
       const specPath = join(tempDir, 'single.md')
       writeFileSync(specPath, '# single\n', 'utf8')
 
@@ -378,6 +430,9 @@ describe('autoqa run (args & spec discovery)', () => {
     } finally {
       process.chdir(originalCwd)
       rmSync(tempDir, { recursive: true, force: true })
+      if (originalBaseUrl !== undefined) {
+        process.env.AUTOQA_BASE_URL = originalBaseUrl
+      }
     }
   })
 

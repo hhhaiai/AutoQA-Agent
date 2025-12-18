@@ -72,6 +72,34 @@ describe('redactToolInput', () => {
     expect(result.targetDescription).toBe('input')
   })
 
+  it('redacts mcp tool fill text to textLength only', () => {
+    const result = redactToolInput('mcp__browser__fill', { targetDescription: 'input', text: 'secret password' })
+    expect(result).not.toHaveProperty('text')
+    expect(result.textLength).toBe(15)
+  })
+
+  it('redacts fill text for password fields (regression test for sensitive data)', () => {
+    const result = redactToolInput('fill', { targetDescription: 'password field', text: 'my_secret_password_123' })
+    expect(result).not.toHaveProperty('text')
+    expect(result.textLength).toBe(22)
+    expect(JSON.stringify(result)).not.toContain('my_secret_password_123')
+  })
+
+  it('redacts fill text for username fields (regression test for sensitive data)', () => {
+    const result = redactToolInput('fill', { targetDescription: 'username field', text: 'admin_user' })
+    expect(result).not.toHaveProperty('text')
+    expect(result.textLength).toBe(10)
+    expect(JSON.stringify(result)).not.toContain('admin_user')
+  })
+
+  it('redacts mcp tool assertTextPresent text to textLength only', () => {
+    const result = redactToolInput('mcp__browser__assertTextPresent', { text: 'my_secret_password_123', visibleNth: 0 })
+    expect(result).not.toHaveProperty('text')
+    expect(result.textLength).toBe(22)
+    expect((result as any).visibleNth).toBe(0)
+    expect(JSON.stringify(result)).not.toContain('my_secret_password_123')
+  })
+
   it('redacts navigate URL credentials', () => {
     const result = redactToolInput('navigate', { url: 'https://user:pass@example.com/path' })
     expect(result.url).not.toContain('user')

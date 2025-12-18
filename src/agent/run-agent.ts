@@ -5,6 +5,7 @@ import type { Page } from 'playwright'
 import type { MarkdownSpec } from '../markdown/spec-types.js'
 import { createBrowserToolsMcpServer } from './browser-tools-mcp.js'
 import type { Logger } from '../logging/index.js'
+import { redactToolInput } from '../logging/index.js'
 import type { Guardrails } from '../config/schema.js'
 import { DEFAULT_GUARDRAILS } from '../config/defaults.js'
 import {
@@ -60,7 +61,7 @@ ${steps}
 Rules:
 - Use ONLY the provided browser tools (snapshot/navigate/click/fill/select_option/scroll/wait/assertTextPresent/assertElementVisible).
 - Execute steps in order.
-- The browser page starts at about:blank. Always call navigate('/') first to open the site.
+- The browser page starts at about:blank. At the start of Step 1, you MUST call navigate() once (with stepIndex=1) to open the site. If Step 1 is a Navigate step, navigate to its target; otherwise navigate('/').
 - Tool inputs MUST be plain strings (do not include Markdown backticks or quotes around values).
 - Keep tool inputs minimal and avoid leaking secrets.
 - Step tracking: For EVERY tool call, include the stepIndex parameter matching the current step number (1-indexed from the Steps list above). This is critical for tracking progress and error recovery.
@@ -148,8 +149,19 @@ function getUserContent(message: any): unknown {
 
 function writeDebug(enabled: boolean, line: string): void {
   if (!enabled) return
+
+  const secrets = [process.env.AUTOQA_PASSWORD, process.env.AUTOQA_USERNAME, process.env.ANTHROPIC_API_KEY]
+    .filter((v): v is string => typeof v === 'string' && v.length >= 4)
+    .filter((v, idx, arr) => arr.indexOf(v) === idx)
+    .sort((a, b) => b.length - a.length)
+
+  let out = line
+  for (const secret of secrets) {
+    out = out.split(secret).join('[REDACTED]')
+  }
+
   try {
-    process.stderr.write(`${line}\n`)
+    process.stderr.write(`${out}\n`)
   } catch {
     return
   }
@@ -287,7 +299,12 @@ export async function runAgent(options: RunAgentOptions): Promise<void> {
 
               writeDebug(
                 options.debug,
-                `tool_use=${name}${id ? ` id=${id}` : ''} input=${truncate(safeStringify(input), 400)}`,
+                `tool_use=${name}${id ? ` id=${id}` : ''} input=${truncate(
+                  safeStringify(
+                    input && typeof input === 'object' ? redactToolInput(name, input as any) : input,
+                  ),
+                  400,
+                )}`,
               )
               continue
             }

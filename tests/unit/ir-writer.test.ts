@@ -119,6 +119,28 @@ describe('IR Writer', () => {
       expect(result.targetDescription).toBe('password field')
     })
 
+    it('should redact fill text for password input (regression test for sensitive data)', () => {
+      const result = redactToolInputForIR('fill', {
+        targetDescription: 'Password input',
+        text: 'my_secret_password_123',
+      })
+      expect(result.textRedacted).toBe(true)
+      expect(result.textLength).toBe(22)
+      expect(result.text).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain('my_secret_password_123')
+    })
+
+    it('should redact fill text for username input (regression test for sensitive data)', () => {
+      const result = redactToolInputForIR('fill', {
+        targetDescription: 'Username input',
+        text: 'admin_user',
+      })
+      expect(result.textRedacted).toBe(true)
+      expect(result.textLength).toBe(10)
+      expect(result.text).toBeUndefined()
+      expect(JSON.stringify(result)).not.toContain('admin_user')
+    })
+
     it('should not redact text for non-fill tools', () => {
       const result = redactToolInputForIR('click', {
         targetDescription: 'submit button',

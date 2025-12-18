@@ -41,14 +41,14 @@ tracking_system: file-system
 story_location: "docs/sprint-artifacts"
 
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-set-up-initial-project-from-starter-template: done
   1-2-autoqa-init-autoqa-config-json: done
   1-3-autoqa-init-create-specs-example: done
   1-4-autoqa-init-check-anthropic-api-key: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-autoqa-run-args-spec-discovery: done
   2-2-headless-debug-url-validation: done
   2-3-parse-markdown-spec-preconditions-steps-assertions: done
@@ -60,14 +60,21 @@ development_status:
   2-9-playwright-trace-recording-retention: done
   epic-2-retrospective: optional
 
-  epic-3: in-progress
+  epic-3: done
   3-1-assert-tools-asserttextpresent-assertelementvisible: done
   3-2-errors-to-agent-sdk-self-heal-retry: done
   3-3-self-heal-guardrails-max-tool-calls-errors-retries: done
   3-4-failure-artifacts-exit-codes-ci: done
   epic-3-retrospective: optional
 
-  epic-4: in-progress
+  epic-4: done
   4-1-runtime-locator-validation-ir: done
   4-2-auto-export-playwright-test: done
   epic-4-retrospective: optional
+
+  epic-5: in-progress
+  5-1-env-base-url: done
+  5-2-env-login-base-url: done
+  5-3-markdown-template-vars: done
+  5-4-sensitive-testdata-injection: done
+  epic-5-retrospective: optional

@@ -26,6 +26,7 @@ FR8: 记录通过的动作轨迹（IR）：当 Agent 成功完成 `navigate/clic
 FR9: 稳定定位器沉淀：当 Agent 成功点击/填表某个元素时，系统应在运行时生成多种稳定 locator 候选，并通过无副作用验证筛选；只允许将验证通过的候选用于后续导出。
 FR10: 提供结构化页面表示：系统应支持获取页面的可访问性结构化快照（AX/ARIA snapshot），作为比截图更高效的页面理解输入，用于元素定位、自愈与调试。
 FR11: 提供可回放调试产物：系统应支持按 spec 录制 Playwright trace（含网络/DOM/操作时间线），并将 trace 作为运行产物落盘，便于失败复现与调试。
+FR12: 环境与测试数据配置：支持按环境加载（如 `.env.test`/`.env.prod`）并为 spec 提供可替换变量（例如 `BASE_URL`/`LOGIN_BASE_URL`），同时提供不在 Markdown 用例中硬编码敏感信息（如账号/密码）的机制。
 
 ### NonFunctional Requirements
 
@@ -62,6 +63,7 @@ FR8: Epic 4 - 动作 IR 记录与导出
 FR9: Epic 4 - 运行时 locator 候选验证与沉淀
 FR10: Epic 2 - 结构化快照（AX/ARIA snapshot）
 FR11: Epic 2 - Playwright trace 录制与落盘
+FR12: Epic 5 - 环境与测试数据配置（多环境 + 账号/密码等）
 
 ## Epic List
 
@@ -80,6 +82,76 @@ FR11: Epic 2 - Playwright trace 录制与落盘
 ### Epic 4: 沉淀与导出（从自然语言执行到 Playwright Test）
 用户完成该 Epic 后可以在 `autoqa run` 跑通自然语言用例后，自动记录可复现的动作 IR（含稳定 locator 候选），并自动导出可在 CI 执行的 `@playwright/test` 用例文件到 `tests/autoqa/`。
 **FRs covered:** FR8, FR9
+
+### Epic 5: 环境与测试数据配置（多环境 + 登录凭据等敏感配置）
+用户完成该 Epic 后可以用 `.env.<env>`（例如 `.env.test`/`.env.prod`）切换不同环境的 `baseUrl/loginBaseUrl`，并在 Markdown spec 中使用变量占位（例如 `{{BASE_URL}}`/`{{LOGIN_BASE_URL}}`/`{{ENV}}`）而不是写死域名；同时支持将账号/密码等敏感信息放在环境配置中，并避免在 Markdown 用例与日志中直接暴露。
+**FRs covered:** FR12
+
+### Story 5.1: 支持通过 `.env.<env>` 配置 `BASE_URL`（登录后站点）
+  
+  As a QA 工程师,
+  I want 在不同环境（test/prod）下通过 `.env.<env>` 提供运行目标站点的 Base URL，
+  So that Markdown 用例不需要为每个环境复制一份。
+  
+  **FRs covered:** FR12
+
+  Tech Spec: `docs/sprint-artifacts/5-1-env-base-url.md`
+  
+  **Acceptance Criteria:**
+  
+  **Given** 存在 `.env.test` 且包含 `AUTOQA_BASE_URL`
+  **When** 运行 `autoqa run ... --env test`
+ **Then** `autoqa run` 应使用该 `AUTOQA_BASE_URL` 作为 `baseUrl`
+
+### Story 5.2: 支持配置 `LOGIN_BASE_URL` 并在 spec 中引用
+  
+  As a QA 工程师,
+  I want 在不同环境下通过 `.env.<env>` 提供 `AUTOQA_LOGIN_BASE_URL` 并在 spec 中通过 `{{LOGIN_BASE_URL}}` 引用，
+  So that 登录页跨域/跨环境时也不需要在用例里写死域名。
+  
+  **FRs covered:** FR12
+
+  Tech Spec: `docs/sprint-artifacts/5-2-env-login-base-url.md`
+  
+  **Acceptance Criteria:**
+  
+  **Given** `.env.<env>` 中配置了 `AUTOQA_LOGIN_BASE_URL`
+  **When** spec 包含 `Navigate to {{LOGIN_BASE_URL}}/login`
+ **Then** 执行时应在解析 spec 前完成模板替换，且 `navigate` 使用替换后的绝对 URL
+
+### Story 5.3: 支持 spec 模板变量（`{{BASE_URL}}`/`{{LOGIN_BASE_URL}}`/`{{ENV}}`）
+  
+  As a QA 工程师,
+  I want 在 Markdown spec 中使用少量受控的模板变量，
+  So that 用例可以在多环境下复用并保持可读性。
+  
+  **FRs covered:** FR12
+  
+  Tech Spec: `docs/sprint-artifacts/5-3-markdown-template-vars.md`
+
+  **Acceptance Criteria:**
+  
+  **Given** spec 中包含 `{{BASE_URL}}`、`{{LOGIN_BASE_URL}}`、`{{ENV}}`
+  **When** 运行 `autoqa run`
+ **Then** 系统应在解析 spec 前将这些变量替换为运行时值
+ **And** 当出现未知变量或必需变量缺失时，应以退出码 `2` 失败并给出可理解提示
+
+### Story 5.4: 支持敏感测试数据（账号/密码）从配置注入，避免写入 Markdown
+  
+  As a QA 工程师,
+  I want 将账号/密码等敏感测试数据放在环境配置中，并在 spec 中以占位符引用，
+  So that 用例可以提交到仓库而不泄漏敏感信息。
+  
+  **FRs covered:** FR12
+
+  Tech Spec: `docs/sprint-artifacts/5-4-sensitive-testdata-injection.md`
+  
+  **Acceptance Criteria:**
+  
+  **Given** `.env.<env>` 中配置了例如 `AUTOQA_USERNAME` / `AUTOQA_PASSWORD`
+  **When** spec 中包含 `Fill the "Username" field with {{USERNAME}}` / `Fill the "Password" field with {{PASSWORD}}`
+ **Then** 系统应在执行前完成替换
+ **And** 日志脱敏逻辑应避免在结构化日志中明文记录敏感字段（例如 password）
 
 ### Story 1.1: Set up initial project from starter template
   

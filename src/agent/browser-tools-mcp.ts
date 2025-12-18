@@ -11,7 +11,7 @@ import { toToolError } from '../tools/playwright-error.js'
 import type { ContentBlock } from './pre-action-screenshot.js'
 import { runWithPreActionScreenshot } from './pre-action-screenshot.js'
 import type { Logger } from '../logging/index.js'
-import { redactToolInput, sanitizeRelativePath } from '../logging/index.js'
+import { redactToolInput, sanitizeOriginOnly, sanitizeRelativePath } from '../logging/index.js'
 import { captureSnapshots, writeSnapshotsIfNeeded, type SnapshotMeta } from '../browser/snapshot.js'
 import { createIRRecorder, nullRecorder, extractFingerprint, type ElementFingerprint, type IRRecorder, type PreActionResult, type IRToolName } from '../ir/index.js'
 
@@ -353,7 +353,7 @@ export function createBrowserToolsMcpServer(options: CreateBrowserToolsMcpServer
           const fileBaseName = nextFileBaseName('navigate')
           const startTime = Date.now()
           logToolCall('navigate', { url }, stepIndex)
-          writeDebug(options.debug, `mcp_tool=navigate url=${url} stepIndex=${stepIndex}`)
+          writeDebug(options.debug, `mcp_tool=navigate url=${sanitizeOriginOnly(url)} stepIndex=${stepIndex}`)
 
           const snapshotCapturePromise = contextMode === 'snapshot' ? capturePreActionSnapshot() : Promise.resolve(undefined)
 

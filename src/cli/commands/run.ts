@@ -12,11 +12,13 @@ import { discoverMarkdownSpecs } from '../../specs/discover.js'
 import { validateRunArgs } from '../../runner/validate-run-args.js'
 import { runSpecs } from '../../runner/run-specs.js'
 import { parseMarkdownSpec } from '../../markdown/parse-markdown-spec.js'
+import { renderMarkdownTemplate } from '../../markdown/template.js'
 import type { MarkdownSpec } from '../../markdown/spec-types.js'
 import { runAgent } from '../../agent/run-agent.js'
 import { probeAgentSdkAuth, type AgentSdkAuthProbeResult } from '../../auth/probe.js'
 import { createLogger, ensureArtifactDir, getArtifactRootPath } from '../../logging/index.js'
 import { readConfig, resolveGuardrails } from '../../config/read.js'
+import { loadEnvFiles } from '../../env/load-env.js'
 
 function sanitizeBaseUrlForLog(baseUrl: string): string {
   try {
@@ -55,14 +57,28 @@ export function registerRunCommand(program: Command) {
     .command('run')
     .description('Discover Markdown specs under a file or directory and run them')
     .argument('<file-or-dir>', 'Markdown spec file or directory containing Markdown specs')
+    .option('--env <name>', 'Environment name used to load .env.<name> (e.g. test, prod)')
     .option('--url <baseUrl>', 'Base URL to test against (e.g. http://localhost:3000)')
+    .option('--login-url <loginBaseUrl>', 'Login Base URL (optional, e.g. https://login.example.com)')
     .option('--debug', 'Run in debug mode (headed browser + extra logs)')
     .option('--headless', 'Force headless mode (conflicts with --debug)')
-    .action(async (fileOrDir: string, options: { url?: string; debug?: boolean; headless?: boolean }) => {
+    .action(async (fileOrDir: string, options: { env?: string; url?: string; loginUrl?: string; debug?: boolean; headless?: boolean }) => {
       const { writeOut, writeErr } = program.configureOutput()
 
+      const envLoad = loadEnvFiles({ envName: options.env, requireEnvNameFile: Boolean(options.env) })
+      if (!envLoad.ok) {
+        program.error(envLoad.message, { exitCode: 2 })
+        return
+      }
+
+      const resolvedEnvName = (options.env ?? process.env.AUTOQA_ENV ?? '').trim()
+
+      const baseUrlRaw = options.url ?? process.env.AUTOQA_BASE_URL
+      const loginUrlRaw = options.loginUrl ?? process.env.AUTOQA_LOGIN_BASE_URL
+
       const validated = validateRunArgs({
-        url: options.url,
+        url: baseUrlRaw,
+        loginUrl: loginUrlRaw,
         debug: options.debug,
         headless: options.headless,
       })
@@ -118,6 +134,12 @@ export function registerRunCommand(program: Command) {
 
       writeOutLine(writeErr, `runId=${runId}`)
       writeOutLine(writeErr, `baseUrl=${sanitizeBaseUrlForLog(validated.value.baseUrl)}`)
+      if (validated.value.loginBaseUrl) {
+        writeOutLine(writeErr, `loginBaseUrl=${sanitizeBaseUrlForLog(validated.value.loginBaseUrl)}`)
+      }
+      if (resolvedEnvName) {
+        writeOutLine(writeErr, `env=${resolvedEnvName}`)
+      }
       writeOutLine(writeErr, `headless=${validated.value.headless}`)
       writeOutLine(writeErr, `debug=${validated.value.debug}`)
       writeOutLine(writeErr, `artifactRoot=${artifactRoot}`)
@@ -143,8 +165,22 @@ export function registerRunCommand(program: Command) {
         }
 
         let parsed: ReturnType<typeof parseMarkdownSpec>
+
+        const rendered = renderMarkdownTemplate(markdown, {
+          BASE_URL: validated.value.baseUrl,
+          LOGIN_BASE_URL: validated.value.loginBaseUrl,
+          ENV: resolvedEnvName,
+          USERNAME: process.env.AUTOQA_USERNAME,
+          PASSWORD: process.env.AUTOQA_PASSWORD,
+        })
+
+        if (!rendered.ok) {
+          program.error(`Invalid spec template: ${specPath}\n${rendered.message}`, { exitCode: 2 })
+          return
+        }
+
         try {
-          parsed = parseMarkdownSpec(markdown)
+          parsed = parseMarkdownSpec(rendered.value)
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err)
           program.error(`Failed to parse spec: ${specPath}\n${message}`, { exitCode: 2 })

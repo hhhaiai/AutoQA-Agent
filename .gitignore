@@ -4,6 +4,9 @@ node_modules/
 .gemini
 .DS_Store
 autoqa.config.json
+.env
+.env.*
+!.env*.example
 # specs/
 conversations/
 scripts
