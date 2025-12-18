@@ -195,7 +195,7 @@ export function registerRunCommand(program: Command) {
           return
         }
 
-        parsedSpecs.push({ specPath, spec: parsed.value })
+        parsedSpecs.push({ specPath, spec: parsed.value, rawContent: markdown })
       }
 
       if (validated.value.debug) {

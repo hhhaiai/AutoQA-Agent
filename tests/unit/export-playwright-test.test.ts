@@ -128,7 +128,9 @@ describe('export-playwright-test', () => {
 
         const content = await readFile(result.exportPath, 'utf-8')
         expect(content).toContain("import { test, expect } from '@playwright/test'")
-        expect(content).toContain('const baseUrl =')
+        expect(content).toContain('loadEnvFiles()')
+        expect(content).toContain("const baseUrl = getEnvVar('AUTOQA_BASE_URL')")
+        expect(content).not.toContain("const baseUrl = 'https://example.com'")
         expect(content).toContain('page.goto')
         expect(content).toContain("page.getByTestId('username').fill")
         expect(content).toContain("page.getByRole('button', { name: 'Login' }).click()")
@@ -316,14 +318,20 @@ describe('export-playwright-test', () => {
       }
     })
 
-    it('uses fill value from spec text, not IR (IR is redacted)', async () => {
+    it('uses env vars for template variables in raw spec', async () => {
       const specPath = join(testDir, 'specs', 'test.md')
+      // Rendered spec (after template substitution)
       const spec: MarkdownSpec = {
         preconditions: ['Base URL accessible'],
         steps: [
-          { index: 1, text: "Fill the 'Username' field with secret_password", kind: 'action' },
+          { index: 1, text: "Fill the 'Username' field with standard_user", kind: 'action' },
         ],
       }
+      // Raw spec content with {{VAR}} placeholders
+      const rawSpecContent = `## Steps
+
+1. Fill the 'Username' field with {{USERNAME}}
+`
 
       const records: ActionRecord[] = [
         createMockRecord({
@@ -352,13 +360,15 @@ describe('export-playwright-test', () => {
         specPath,
         spec,
         baseUrl: 'https://example.com',
+        rawSpecContent,
       })
 
       expect(result.ok).toBe(true)
       if (result.ok) {
         const content = await readFile(result.exportPath, 'utf-8')
-        // Should use value from spec, not IR
-        expect(content).toContain('secret_password')
+        expect(content).toContain("const username = getEnvVar('AUTOQA_USERNAME')")
+        expect(content).toContain("page.getByTestId('username').fill(username)")
+        expect(content).not.toContain('standard_user')
         expect(content).not.toContain('[REDACTED]')
       }
     })

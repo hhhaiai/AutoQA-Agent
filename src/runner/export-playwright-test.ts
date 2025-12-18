@@ -41,6 +41,120 @@ export type ExportOptions = {
   specPath: string
   spec: MarkdownSpec
   baseUrl: string
+  loginBaseUrl?: string
+  /** Raw (unrendered) spec content for extracting {{VAR}} placeholders */
+  rawSpecContent?: string
+}
+
+/**
+ * Pattern to match {{VAR}} placeholders in spec text.
+ */
+const TEMPLATE_VAR_PATTERN = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g
+
+/**
+ * Extract all {{VAR}} placeholders from a string.
+ * Returns array of variable names (without braces).
+ */
+function extractTemplateVars(text: string): string[] {
+  const vars: string[] = []
+  let match: RegExpExecArray | null
+  const pattern = new RegExp(TEMPLATE_VAR_PATTERN.source, 'g')
+  while ((match = pattern.exec(text)) !== null) {
+    const varName = (match[1] ?? '').trim()
+    if (varName && !vars.includes(varName)) {
+      vars.push(varName)
+    }
+  }
+  return vars
+}
+
+/**
+ * Parse raw spec content and build a map of stepIndex -> variables used in that step.
+ * Also returns all unique variables found across all steps.
+ */
+function parseRawSpecVars(rawContent: string): {
+  stepVars: Map<number, { vars: string[]; rawText: string }>
+  allVars: Set<string>
+} {
+  const stepVars = new Map<number, { vars: string[]; rawText: string }>()
+  const allVars = new Set<string>()
+
+  // Parse steps section
+  const stepsMatch = rawContent.match(/##\s*Steps[\s\S]*?(?=##|$)/i)
+  if (!stepsMatch) return { stepVars, allVars }
+
+  const stepsSection = stepsMatch[0]
+  // Match numbered steps: "1. Step text" or "1) Step text"
+  const stepPattern = /^\s*(\d+)[.)\s]+(.+)$/gm
+  let match: RegExpExecArray | null
+  while ((match = stepPattern.exec(stepsSection)) !== null) {
+    const stepIndex = parseInt(match[1], 10)
+    const rawText = match[2].trim()
+    const vars = extractTemplateVars(rawText)
+    if (vars.length > 0) {
+      stepVars.set(stepIndex, { vars, rawText })
+      vars.forEach((v) => allVars.add(v))
+    }
+  }
+
+  return { stepVars, allVars }
+}
+
+function safeParseUrl(value: string): URL | null {
+  try {
+    return new URL(value)
+  } catch {
+    return null
+  }
+}
+
+function extractRelativeFromAbsolute(urlStr: string, baseUrlStr: string | undefined): string | null {
+  if (!baseUrlStr) return null
+  const base = safeParseUrl(baseUrlStr)
+  const url = safeParseUrl(urlStr)
+  if (!base || !url) return null
+  if (url.origin !== base.origin) return null
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+type StepNeeds = {
+  /** Set of variable names (e.g. 'USERNAME', 'PASSWORD') needed by this step */
+  envVars?: Set<string>
+  loginBaseUrl?: boolean
+}
+
+/**
+ * Redact step text for export comments.
+ * If stepVars contains variables for this step, replace the rendered value with variable reference.
+ */
+function redactStepTextForExport(
+  stepText: string,
+  baseUrl: string,
+  loginBaseUrl?: string,
+  stepVarInfo?: { vars: string[]; rawText: string },
+): string {
+  // If we have raw text with variables, use it (replacing {{VAR}} with AUTOQA_VAR)
+  if (stepVarInfo && stepVarInfo.vars.length > 0) {
+    let redacted = stepVarInfo.rawText
+    for (const varName of stepVarInfo.vars) {
+      redacted = redacted.replace(
+        new RegExp(`\\{\\{\\s*${varName}\\s*\\}\\}`, 'g'),
+        `AUTOQA_${varName}`,
+      )
+    }
+    return redacted
+  }
+
+  // Fallback: redact absolute URLs
+  const navigatePath = parseNavigateStep(stepText)
+  if (navigatePath !== null && navigatePath.startsWith('http')) {
+    const relFromBase = extractRelativeFromAbsolute(navigatePath, baseUrl)
+    if (relFromBase !== null) return `Navigate to ${relFromBase}`
+    const relFromLogin = extractRelativeFromAbsolute(navigatePath, loginBaseUrl)
+    if (relFromLogin !== null) return `Navigate to ${relFromLogin}`
+  }
+
+  return stepText
 }
 
 /**
@@ -250,13 +364,17 @@ function findMatchingRecord(
 
 /**
  * Generate code for a single step.
+ * @param stepVarInfo - If provided, contains the variables used in this step from raw spec
  */
 function generateStepCode(
   step: MarkdownSpecStep,
   records: ActionRecord[],
   baseUrl: string,
-): { code: string; error?: string } {
+  loginBaseUrl?: string,
+  stepVarInfo?: { vars: string[]; rawText: string },
+): { code: string; error?: string; needs?: StepNeeds } {
   const stepText = step.text
+  const stepVars = stepVarInfo?.vars ?? []
 
   // Handle assertions
   if (step.kind === 'assertion') {
@@ -324,14 +442,26 @@ function generateStepCode(
   // Handle navigate
   const navigatePath = parseNavigateStep(stepText)
   if (navigatePath !== null) {
-    const fullUrl = navigatePath.startsWith('http')
-      ? navigatePath
-      : `new URL('${escapeString(navigatePath)}', baseUrl).toString()`
-
     if (navigatePath.startsWith('http')) {
+      const relFromBase = extractRelativeFromAbsolute(navigatePath, baseUrl)
+      if (relFromBase !== null) {
+        return {
+          code: `  await page.goto(new URL('${escapeString(relFromBase)}', baseUrl).toString());`,
+        }
+      }
+
+      const relFromLogin = extractRelativeFromAbsolute(navigatePath, loginBaseUrl)
+      if (relFromLogin !== null) {
+        return {
+          code: `  await page.goto(new URL('${escapeString(relFromLogin)}', loginBaseUrl).toString());`,
+          needs: { loginBaseUrl: true },
+        }
+      }
+
       return { code: `  await page.goto('${escapeString(navigatePath)}');` }
     }
-    return { code: `  await page.goto(${fullUrl});` }
+
+    return { code: `  await page.goto(new URL('${escapeString(navigatePath)}', baseUrl).toString());` }
   }
 
   // Handle fill - must use IR chosenLocator
@@ -346,6 +476,18 @@ function generateStepCode(
     }
 
     const locatorCode = record.element!.chosenLocator!.code
+
+    // If this step has variables from raw spec, use them
+    if (stepVars.length > 0) {
+      // Use the first variable found in this step for the fill value
+      const varName = stepVars[0]
+      const jsVarName = varName.toLowerCase()
+      return {
+        code: `  await ${locatorCode}.fill(${jsVarName});`,
+        needs: { envVars: new Set(stepVars) },
+      }
+    }
+
     const fillValue = fillParsed.value
     return {
       code: `  await ${locatorCode}.fill('${escapeString(fillValue)}');`,
@@ -393,6 +535,21 @@ function generateStepCode(
       const url = record.toolInput?.url as string | undefined
       if (url) {
         if (url.startsWith('http')) {
+          const relFromBase = extractRelativeFromAbsolute(url, baseUrl)
+          if (relFromBase !== null) {
+            return {
+              code: `  await page.goto(new URL('${escapeString(relFromBase)}', baseUrl).toString());`,
+            }
+          }
+
+          const relFromLogin = extractRelativeFromAbsolute(url, loginBaseUrl)
+          if (relFromLogin !== null) {
+            return {
+              code: `  await page.goto(new URL('${escapeString(relFromLogin)}', loginBaseUrl).toString());`,
+              needs: { loginBaseUrl: true },
+            }
+          }
+
           return { code: `  await page.goto('${escapeString(url)}');` }
         }
         return { code: `  await page.goto(new URL('${escapeString(url)}', baseUrl).toString());` }
@@ -405,10 +562,22 @@ function generateStepCode(
 
     if (record.toolName === 'fill' && hasValidChosenLocator(record)) {
       // For fill, we need to get the value from spec text, not IR (IR is redacted)
-      const fillMatch = stepText.match(/with\s+(.+)$/i) || stepText.match(/输入\s+(.+)$/i)
-      const fillValue = fillMatch ? fillMatch[1].trim() : ''
-      if (fillValue) {
-        return { code: `  await ${record.element!.chosenLocator!.code}.fill('${escapeString(fillValue)}');` }
+      const parsed = parseFillStep(stepText)
+      if (parsed) {
+        // If this step has variables from raw spec, use them
+        if (stepVars.length > 0) {
+          const varName = stepVars[0]
+          const jsVarName = varName.toLowerCase()
+          return {
+            code: `  await ${record.element!.chosenLocator!.code}.fill(${jsVarName});`,
+            needs: { envVars: new Set(stepVars) },
+          }
+        }
+
+        const fillValue = parsed.value
+        if (fillValue) {
+          return { code: `  await ${record.element!.chosenLocator!.code}.fill('${escapeString(fillValue)}');` }
+        }
       }
     }
 
@@ -427,24 +596,53 @@ function generateStepCode(
 }
 
 /**
+ * Generate environment variable declarations for the given variable names.
+ * Each variable is declared as `const varName = process.env.AUTOQA_VARNAME` with a null check.
+ */
+function generateEnvVarDeclarations(envVars: Set<string>): string {
+  if (envVars.size === 0) return ''
+
+  const declarations: string[] = []
+  for (const varName of Array.from(envVars).sort()) {
+    const jsVarName = varName.toLowerCase()
+    const envKey = `AUTOQA_${varName}`
+    declarations.push(`const ${jsVarName} = getEnvVar('${envKey}')`)
+  }
+  return declarations.join('\n') + '\n'
+}
+
+/**
  * Generate the full Playwright test file content.
+ * @param rawSpecContent - Optional raw (unrendered) spec content for extracting {{VAR}} placeholders
  */
 function generateTestFileContent(
   specPath: string,
   spec: MarkdownSpec,
   records: ActionRecord[],
   baseUrl: string,
+  loginBaseUrl?: string,
+  rawSpecContent?: string,
 ): { content: string; errors: string[] } {
   const errors: string[] = []
   const stepCodes: string[] = []
+  let needsLoginBaseUrl = false
+  const allEnvVars = new Set<string>()
+
+  // Parse raw spec to get variable mappings per step
+  const { stepVars } = rawSpecContent ? parseRawSpecVars(rawSpecContent) : { stepVars: new Map() }
 
   for (const step of spec.steps) {
-    const { code, error } = generateStepCode(step, records, baseUrl)
+    const stepVarInfo = stepVars.get(step.index)
+    const { code, error, needs } = generateStepCode(step, records, baseUrl, loginBaseUrl, stepVarInfo)
     if (error) {
       errors.push(error)
     }
+    if (needs?.envVars) {
+      needs.envVars.forEach((v) => allEnvVars.add(v))
+    }
+    if (needs?.loginBaseUrl) needsLoginBaseUrl = true
     if (code) {
-      stepCodes.push(`  // Step ${step.index}: ${step.text}`)
+      stepCodes.push(`  // Step ${step.index}: ${redactStepTextForExport(step.text, baseUrl, loginBaseUrl, stepVarInfo)}`)
       stepCodes.push(code)
     }
   }
@@ -456,13 +654,16 @@ function generateTestFileContent(
     ?.replace(/\.md$/i, '')
     ?.replace(/-/g, ' ') ?? 'Exported Test'
 
-  const content = `import { test, expect } from '@playwright/test';
+  const content = `import { test, expect } from '@playwright/test'
+import { loadEnvFiles, getEnvVar } from './autoqa-env'
 
-const baseUrl = '${escapeString(baseUrl)}';
+loadEnvFiles()
 
+const baseUrl = getEnvVar('AUTOQA_BASE_URL')
+${needsLoginBaseUrl ? `const loginBaseUrl = getEnvVar('AUTOQA_LOGIN_BASE_URL')\n` : ''}${generateEnvVarDeclarations(allEnvVars)}
 test('${escapeString(testName)}', async ({ page }) => {
 ${stepCodes.join('\n')}
-});
+})
 `
 
   return { content, errors }
@@ -472,7 +673,7 @@ ${stepCodes.join('\n')}
  * Export a Playwright test file from IR and spec.
  */
 export async function exportPlaywrightTest(options: ExportOptions): Promise<ExportResult> {
-  const { cwd, runId, specPath, spec, baseUrl } = options
+  const { cwd, runId, specPath, spec, baseUrl, loginBaseUrl, rawSpecContent } = options
 
   // Read IR records for this spec
   let records: ActionRecord[]
@@ -509,7 +710,7 @@ export async function exportPlaywrightTest(options: ExportOptions): Promise<Expo
   }
 
   // Generate test file content
-  const { content, errors } = generateTestFileContent(specPath, spec, records, baseUrl)
+  const { content, errors } = generateTestFileContent(specPath, spec, records, baseUrl, loginBaseUrl, rawSpecContent)
 
   if (errors.length > 0) {
     return {

@@ -33,6 +33,8 @@ function shouldPersistArtifacts(mode: ArtifactMode, ok: boolean): boolean {
 export type ParsedSpec = {
   specPath: string
   spec: MarkdownSpec
+  /** Raw (unrendered) spec content for extracting {{VAR}} placeholders */
+  rawContent?: string
 }
 
 export type RunSpecFn = (input: {
@@ -374,6 +376,7 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
               specPath: spec.specPath,
               spec: spec.spec,
               baseUrl: options.baseUrl,
+              rawSpecContent: spec.rawContent,
             })
 
             if (exportResult.ok) {
