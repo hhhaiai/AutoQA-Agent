@@ -7,6 +7,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/terryso/AutoQA-Agent?style=flat-square)](https://github.com/terryso/AutoQA-Agent/commits)
 [![License](https://img.shields.io/github/license/terryso/AutoQA-Agent?style=flat-square)](https://github.com/terryso/AutoQA-Agent)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-AutoQA--Agent-blue?style=flat-square)](https://deepwiki.com/terryso/AutoQA-Agent)
 
 **[English](README.md) | [中文](README.zh.md)**
 
