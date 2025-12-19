@@ -8,99 +8,101 @@
 [![License](https://img.shields.io/github/license/terryso/AutoQA-Agent?style=flat-square)](https://github.com/terryso/AutoQA-Agent)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
 
-基于 Claude Agent SDK + Playwright 的"文档即测试"（Docs-as-Tests）自动化验收测试 CLI 工具。
+**[English](README.md) | [中文](README.zh.md)**
 
-> **当前状态**：Epic 1-4 的核心能力已实现：`autoqa init` 初始化、`autoqa run` 执行闭环、断言 + 自愈护栏、动作 IR 记录与自动导出 `@playwright/test` 用例。
+A "Docs-as-Tests" automated acceptance testing CLI tool based on Claude Agent SDK + Playwright.
 
-## 📖 目录
+> **Current Status**: Core capabilities of Epic 1-4 have been implemented: `autoqa init` initialization, `autoqa run` execution loop, assertions + self-healing guardrails, and action IR recording with automatic export to `@playwright/test` cases.
 
-- [概述](#概述)
-- [快速开始](#快速开始)
-- [工作原理](#工作原理)
-- [已实现功能](#已实现功能)
-- [使用指南](#使用指南)
-- [配置](#配置)
-- [运行产物](#运行产物)
-- [开发指南](#开发指南)
-- [路线图](#路线图)
-- [贡献指南](#贡献指南)
-- [许可证](#许可证)
+## 📖 Table of Contents
 
-## 概述
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [Implemented Features](#implemented-features)
+- [Usage Guide](#usage-guide)
+- [Configuration](#configuration)
+- [Artifacts](#artifacts)
+- [Development Guide](#development-guide)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
-AutoQA-Agent 是一个创新的自动化测试工具，让 QA 和产品经理能够用自然语言 Markdown 编写验收测试，直接转换为可执行的测试流程。
+## Overview
 
-![AutoQA-Agent 总览图](https://i.v2ex.co/hr3K8E93l.png)
+AutoQA-Agent is an innovative automated testing tool that enables QA and product managers to write acceptance tests in natural language Markdown, which are directly converted into executable test flows.
 
-更详细的架构边界与约束说明请参考 [`docs/architecture.md`](docs/architecture.md)。
+![AutoQA-Agent Overview](https://i.v2ex.co/hr3K8E93l.png)
 
-### 核心目标
+For more detailed architecture boundaries and constraints, please refer to [`docs/architecture.md`](docs/architecture.md).
 
-- **消除脚本脆弱性**：通过智能定位策略，减少 UI 微小变动导致的测试维护成本
-- **文档即测试**：用 Markdown 编写测试用例，让非技术人员也能参与测试编写
-- **轻量级 Agent 架构**：依托 Claude Agent SDK 管理推理循环，专注优化浏览器工具质量
+### Core Objectives
 
-## 快速开始
+- **Eliminate Script Fragility**: Reduce test maintenance costs caused by minor UI changes through intelligent locator strategies
+- **Docs as Tests**: Write test cases in Markdown, allowing non-technical personnel to participate in test writing
+- **Lightweight Agent Architecture**: Rely on Claude Agent SDK to manage reasoning loops, focusing on optimizing browser tool quality
 
-### 环境要求
+## Quick Start
+
+### Prerequisites
 
 - Node.js >= 20
-- npm 或 yarn
-- Claude Code 已授权（推荐）或设置 `ANTHROPIC_API_KEY`
+- npm or yarn
+- Claude Code authorized (recommended) or set `ANTHROPIC_API_KEY`
 
-### 安装
+### Installation
 
 ```bash
-# 克隆仓库
+# Clone repository
 git clone https://github.com/terryso/AutoQA-Agent.git
 cd AutoQA-Agent
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 构建项目
+# Build project
 npm run build
 
-# 全局安装（可选）
+# Global installation (optional)
 npm link
 ```
 
-### 初始化项目
+### Initialize Project
 
 ```bash
-# 初始化配置
+# Initialize configuration
 autoqa init
 
-# 这将创建：
-# - autoqa.config.json - 配置文件
-# - specs/ - 测试用例目录
-# - specs/login-example.md - 示例 Markdown 用例（如果不存在则创建）
+# This will create:
+# - autoqa.config.json - Configuration file
+# - specs/ - Test case directory
+# - specs/login-example.md - Example Markdown case (created if not exists)
 ```
 
-### 运行第一个测试
+### Run Your First Test
 
 ```bash
-# 运行单个测试（仓库自带示例）
+# Run a single test (built-in example)
 autoqa run specs/saucedemo-01-login.md --url https://www.saucedemo.com/
 
-# 运行目录下所有测试
+# Run all tests in directory
 autoqa run specs/ --url https://www.saucedemo.com/
 
-# 调试模式（显示浏览器界面）
+# Debug mode (show browser interface)
 autoqa run specs/saucedemo-01-login.md --url https://www.saucedemo.com/ --debug
 ```
 
-## 工作原理
+## How It Works
 
 ```mermaid
 flowchart TD
-    A["Markdown 测试用例"] --> B["解析器<br/>提取 Preconditions & Steps"]
-    B --> C["Claude Agent SDK<br/>ReAct 循环执行"]
-    C --> D["MCP 浏览器工具<br/>snapshot/navigate/click/fill"]
-    D --> E["Playwright 引擎<br/>实际浏览器操作"]
-    E --> F["运行产物<br/>截图/快照/日志/Trace"]
-    E --> G["动作 IR<br/>.autoqa/runs/<runId>/ir.jsonl"]
-    G --> H["导出代码<br/>tests/autoqa/*.spec.ts"]
+    A["Markdown Test Case"] --> B["Parser<br/>Extract Preconditions & Steps"]
+    B --> C["Claude Agent SDK<br/>ReAct Loop Execution"]
+    C --> D["MCP Browser Tools<br/>snapshot/navigate/click/fill"]
+    D --> E["Playwright Engine<br/>Actual Browser Operations"]
+    E --> F["Artifacts<br/>Screenshots/Snapshots/Logs/Traces"]
+    E --> G["Action IR<br/>.autoqa/runs/<runId>/ir.jsonl"]
+    G --> H["Export Code<br/>tests/autoqa/*.spec.ts"]
 
     style A fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
     style B fill:#f3e5f5,stroke:#9c27b0,color:#4a148c
@@ -112,52 +114,52 @@ flowchart TD
     style H fill:#e0f7fa,stroke:#00acc1,color:#004d40
 ```
 
-### 执行流程
+### Execution Flow
 
-1. **Markdown 解析**：提取前置条件和测试步骤
-2. **Agent 执行**：Claude Agent SDK 管理"观察-思考-行动"循环
-3. **智能定位**：优先使用稳定的 ref 引用，失败时回退到语义描述
-4. **断言与自愈**：对 Verify/Assert 步骤执行断言工具；失败时回流错误上下文触发重试，并受护栏限制
-5. **结果收集**：自动记录截图、快照、Trace 与结构化日志
-6. **沉淀与导出**：记录动作 IR，并在 spec 成功后自动导出 `@playwright/test` 用例到 `tests/autoqa/`
+1. **Markdown Parsing**: Extract preconditions and test steps
+2. **Agent Execution**: Claude Agent SDK manages "observe-think-act" loop
+3. **Intelligent Locating**: Prioritize stable ref references, fallback to semantic descriptions on failure
+4. **Assertions & Self-Healing**: Execute assertion tools for Verify/Assert steps; flow back error context for retry on failure, limited by guardrails
+5. **Result Collection**: Automatically record screenshots, snapshots, traces, and structured logs
+6. **沉淀与导出**: Record action IR, and automatically export `@playwright/test` cases to `tests/autoqa/` after spec success
 
-## 已实现功能
+## Implemented Features
 
-### CLI 命令
+### CLI Commands
 
-- **`autoqa init`** - 初始化项目配置
-- **`autoqa run <path> --url <baseUrl>`** - 执行测试用例（`--url` 必填）
-- **`autoqa run --debug`** - 调试模式运行
-- **`autoqa run --headless`** - 无头模式运行（默认）
+- **`autoqa init`** - Initialize project configuration
+- **`autoqa run <path> --url <baseUrl>`** - Execute test cases (`--url` is required)
+- **`autoqa run --debug`** - Run in debug mode
+- **`autoqa run --headless`** - Run in headless mode (default)
 
-### 浏览器工具
+### Browser Tools
 
-| 工具 | 功能描述 | 参数 |
-|------|---------|------|
-| `snapshot` | 采集可访问性快照 | - |
-| `navigate` | 导航到指定页面 | url |
-| `click` | 点击元素 | ref, targetDescription |
-| `fill` | 填充输入框 | ref, targetDescription, text |
-| `select_option` | 选择下拉选项 | ref, label |
-| `scroll` | 滚动页面 | direction, amount |
-| `wait` | 显式等待 | seconds |
-| `assertTextPresent` | 断言页面包含指定文本且至少有一个可见匹配 | text |
-| `assertElementVisible` | 断言目标元素可见（支持语义描述解析） | targetDescription |
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `snapshot` | Capture accessibility snapshot | - |
+| `navigate` | Navigate to specified page | url |
+| `click` | Click element | ref, targetDescription |
+| `fill` | Fill input field | ref, targetDescription, text |
+| `select_option` | Select dropdown option | ref, label |
+| `scroll` | Scroll page | direction, amount |
+| `wait` | Explicit wait | seconds |
+| `assertTextPresent` | Assert page contains specified text with at least one visible match | text |
+| `assertElementVisible` | Assert target element is visible (supports semantic description parsing) | targetDescription |
 
-## 使用指南
+## Usage Guide
 
-### 编写测试用例
+### Writing Test Cases
 
-测试用例使用 Markdown 格式，需要包含以下结构：
+Test cases use Markdown format and need to include the following structure:
 
 ```markdown
-# 测试用例标题
+# Test Case Title
 
 ## Preconditions
 
 - Base URL: https://example.com
-- 测试账号已创建
-- 浏览器支持 JavaScript
+- Test account created
+- Browser supports JavaScript
 
 ## Steps
 
@@ -169,25 +171,25 @@ flowchart TD
 6. Verify the user is redirected to dashboard
 ```
 
-说明：当前版本 Base URL 由 `autoqa run --url <baseUrl>` 提供；`## Preconditions` 中的 Base URL 仅用于可读性，不参与解析。
+Note: In the current version, Base URL is provided by `autoqa run --url <baseUrl>`; the Base URL in `## Preconditions` is for readability only and does not participate in parsing.
 
-### 断言语句
+### Assertion Statements
 
-使用以下开头的步骤会被识别为断言：
+Steps starting with the following will be recognized as assertions:
 
 - `Verify` / `Assert`
 - `验证` / `断言`
 
-### 最佳实践
+### Best Practices
 
-1. **保持步骤独立**：每个步骤应该是一个独立的操作
-2. **使用明确的描述**：避免模糊的操作描述
-3. **合理使用断言**：在关键验证点添加断言
-4. **管理测试数据**：使用 Preconditions 声明所需的测试数据
+1. **Keep Steps Independent**: Each step should be an independent operation
+2. **Use Clear Descriptions**: Avoid vague operation descriptions
+3. **Use Assertions Reasonably**: Add assertions at key verification points
+4. **Manage Test Data**: Use Preconditions to declare required test data
 
-## 配置
+## Configuration
 
-`autoqa.config.json` 配置文件：
+`autoqa.config.json` configuration file:
 
 ```json
 {
@@ -200,144 +202,144 @@ flowchart TD
 }
 ```
 
-说明：
+Note:
 
-- `autoqa init` 会在当前目录生成该文件。
-- `autoqa run` 也支持在未生成配置文件的情况下运行（会使用内置默认值），但仍需要通过 `--url` 提供 Base URL。
+- `autoqa init` will generate this file in the current directory.
+- `autoqa run` also supports running without a generated configuration file (will use built-in defaults), but still requires Base URL to be provided via `--url`.
 
-### 环境变量
+### Environment Variables
 
-| 变量名 | 描述 | 默认值 |
-|--------|------|--------|
-| `ANTHROPIC_API_KEY` | Claude API 密钥 | - |
-| `AUTOQA_ARTIFACTS` | 产物落盘策略：`all` / `fail` / `none` | `fail` |
-| `AUTOQA_TOOL_CONTEXT` | 工具调用时注入给 Agent 的上下文：`screenshot` / `snapshot` / `none` | `screenshot` |
-| `AUTOQA_PREFLIGHT_NAVIGATE` | 运行前是否先 `page.goto(baseUrl)` 进行预热：`1` 开启 | - |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ANTHROPIC_API_KEY` | Claude API key | - |
+| `AUTOQA_ARTIFACTS` | Artifact retention strategy: `all` / `fail` / `none` | `fail` |
+| `AUTOQA_TOOL_CONTEXT` | Context injected to Agent during tool calls: `screenshot` / `snapshot` / `none` | `screenshot` |
+| `AUTOQA_PREFLIGHT_NAVIGATE` | Whether to pre-warm with `page.goto(baseUrl)` before run: `1` to enable | - |
 
-## 运行产物
+## Artifacts
 
-执行完成后，测试产物与导出结果主要包含：
+After execution completes, test artifacts and export results mainly include:
 
 ```
 .autoqa/runs/2024-01-01T12-00-00/
-├── run.log.jsonl    # 结构化执行日志
-├── ir.jsonl         # 动作 IR（用于导出 Playwright Test）
-├── screenshots/     # 页面截图（依赖 AUTOQA_ARTIFACTS）
-├── snapshots/       # 可访问性快照（依赖 AUTOQA_ARTIFACTS）
-└── traces/          # Playwright Trace（依赖 AUTOQA_ARTIFACTS）
+├── run.log.jsonl    # Structured execution log
+├── ir.jsonl         # Action IR (for exporting Playwright Test)
+├── screenshots/     # Page screenshots (depends on AUTOQA_ARTIFACTS)
+├── snapshots/       # Accessibility snapshots (depends on AUTOQA_ARTIFACTS)
+└── traces/          # Playwright Traces (depends on AUTOQA_ARTIFACTS)
 ```
 
-此外，成功跑通的 spec 会自动导出 `@playwright/test` 用例到：
+Additionally, successfully run specs will automatically export `@playwright/test` cases to:
 
 ```
 tests/autoqa/*.spec.ts
 ```
 
-## 开发指南
+## Development Guide
 
-### 项目结构
+### Project Structure
 
 ```
 src/
-├── agent/           # Claude Agent SDK 集成、护栏
-├── auth/            # 授权探测
+├── agent/           # Claude Agent SDK integration, guardrails
+├── auth/            # Auth detection
 ├── browser/         # screenshot/snapshot
-├── cli/             # CLI 参数解析与命令路由
-├── config/          # autoqa.config.json 读取与校验
-├── ir/              # 动作 IR、locator 候选与导出依赖的数据结构
-├── markdown/        # Markdown spec 解析
-├── runner/          # spec 生命周期、trace/导出编排
-├── specs/           # spec 发现
+├── cli/             # CLI argument parsing and command routing
+├── config/          # autoqa.config.json reading and validation
+├── ir/              # Action IR, locator candidates and data structures for export dependencies
+├── markdown/        # Markdown spec parsing
+├── runner/          # spec lifecycle, trace/export orchestration
+├── specs/           # spec discovery
 └── tools/           # Playwright adapters + assertions
 ```
 
-### 构建和测试
+### Build and Test
 
 ```bash
-# 开发模式
+# Development mode
 npm run dev
 
-# 运行测试
+# Run tests
 npm test
 
-# 构建生产版本
+# Build production version
 npm run build
 ```
 
-## 路线图
+## Roadmap
 
-### 已完成（Epic）
+### Completed (Epic)
 
-- [x] Epic 1：零配置上手（项目初始化）
-- [x] Epic 2：执行闭环（从 Markdown 驱动浏览器完成流程）
-- [x] Epic 3：验收判定与自愈闭环（断言 + 失败重试 + 护栏）
-- [x] Epic 4：沉淀与导出（动作 IR + 自动导出 Playwright Test）
+- [x] Epic 1: Zero-config onboarding (project initialization)
+- [x] Epic 2: Execution loop (from Markdown driving browser to complete flow)
+- [x] Epic 3: Acceptance judgment and self-healing loop (assertions + failure retry + guardrails)
+- [x] Epic 4: Sedimentation and export (action IR + automatic export Playwright Test)
 
-### Backlog（可选方向）
+### Backlog (Optional Directions)
 
-- [ ] 丰富导出能力（更多语义步骤解析与更完整的断言映射）
-- [ ] 增加更多示例 specs 与端到端演示项目
-- [ ] 文档与架构图持续完善
+- [ ] Enrich export capabilities (more semantic step parsing and more complete assertion mapping)
+- [ ] Add more example specs and end-to-end demo projects
+- [ ] Continuous improvement of documentation and architecture diagrams
 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=terryso/AutoQA-Agent&type=date&legend=top-left)](https://www.star-history.com/#terryso/AutoQA-Agent&type=date&legend=top-left)
 
-## 贡献指南
+## Contributing
 
-我们欢迎所有形式的贡献！
+We welcome all forms of contributions!
 
-### 提交 Issue
+### Submitting Issues
 
-- 使用 Issue 模板报告 Bug 或提出功能建议
-- 提供详细的复现步骤和环境信息
+- Use Issue templates to report bugs or suggest features
+- Provide detailed reproduction steps and environment information
 
-### 提交 Pull Request
+### Submitting Pull Requests
 
-1. Fork 项目
-2. 创建特性分支：`git checkout -b feature/amazing-feature`
-3. 提交更改：`git commit -m 'Add amazing feature'`
-4. 推送分支：`git push origin feature/amazing-feature`
-5. 创建 Pull Request
+1. Fork the project
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push branch: `git push origin feature/amazing-feature`
+5. Create Pull Request
 
-### 开发规范
+### Development Guidelines
 
-- 遵循现有代码风格
-- 添加适当的测试
-- 更新相关文档
+- Follow existing code style
+- Add appropriate tests
+- Update relevant documentation
 
-## 许可证
+## License
 
-本项目采用 [MIT 许可证](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
 
-## 致谢
+## Acknowledgments
 
-- [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) - Agent 框架
-- [Playwright](https://playwright.dev/) - 浏览器自动化
-- [Mermaid](https://mermaid.js.org/) - 图表支持
-
----
-
-## 常见问题
-
-<details>
-<summary>如何调试失败的测试？</summary>
-
-使用 `--debug` 参数运行测试，可以看到浏览器界面。查看 `.autoqa/runs/<runId>/run.log.jsonl` 获取详细执行日志。
-</details>
-
-<details>
-<summary>是否支持 CI/CD 集成？</summary>
-
-是的，可以通过 `--headless` 参数在 CI 环境中运行。退出码约定：0=成功，1=测试失败，2=配置错误。
-</details>
-
-<details>
-<summary>如何处理动态内容？</summary>
-
-Agent 会自动重试失败的操作。建议使用 `wait` 工具等待动态内容加载完成。
-</details>
+- [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) - Agent framework
+- [Playwright](https://playwright.dev/) - Browser automation
+- [Mermaid](https://mermaid.js.org/) - Chart support
 
 ---
 
-如有任何问题，请提交 [Issue](https://github.com/terryso/AutoQA-Agent/issues) 或加入我们的讨论。
+## FAQ
+
+<details>
+<summary>How to debug failed tests?</summary>
+
+Use the `--debug` parameter to run tests and see the browser interface. Check `.autoqa/runs/<runId>/run.log.jsonl` for detailed execution logs.
+</details>
+
+<details>
+<summary>Is CI/CD integration supported?</summary>
+
+Yes, it can run in CI environments through the `--headless` parameter. Exit code conventions: 0=success, 1=test failure, 2=configuration error.
+</details>
+
+<details>
+<summary>How to handle dynamic content?</summary>
+
+The Agent will automatically retry failed operations. It's recommended to use the `wait` tool to wait for dynamic content to load.
+</details>
+
+---
+
+For any questions, please submit an [Issue](https://github.com/terryso/AutoQA-Agent/issues) or join our discussion.

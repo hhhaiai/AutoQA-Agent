@@ -7,33 +7,29 @@
 
 ## Steps
 
-1. Navigate to /
-2. Fill the "Username" field with {{USERNAME}}
-3. Fill the "Password" field with {{PASSWORD}}
-4. Click the "Login" button
-5. Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
+1. include: login
 
-6. Click "Add to cart" for any product
-7. Verify the cart icon badge count becomes 1
+2. Click "Add to cart" for any product
+3. Verify the cart icon badge count becomes 1
 
-8. Click the cart icon
-9. Verify the cart page shows "Your Cart" and contains at least 1 item
-10. Click the "Checkout" button
+4. Click the cart icon
+5. Verify the cart page shows "Your Cart" and contains at least 1 item
+6. Click the "Checkout" button
 
-11. Verify the checkout information page is shown (e.g. title contains "Checkout: Your Information")
-12. Fill in First Name with `Test`
-13. Fill in Last Name with `User`
-14. Fill in Postal Code/Zip with `100000`
-15. Click the "Continue" button
+7. Verify the checkout information page is shown (e.g. title contains "Checkout: Your Information")
+8. Fill in First Name with `Test`
+9. Fill in Last Name with `User`
+10. Fill in Postal Code/Zip with `100000`
+11. Click the "Continue" button
 
-16. Verify the checkout overview page is shown (e.g. title contains "Checkout: Overview")
-17. Verify the overview shows:
+12. Verify the checkout overview page is shown (e.g. title contains "Checkout: Overview")
+13. Verify the overview shows:
     - item(s) to purchase
     - item total, tax, and total
 
-18. Click the "Finish" button
-19. Verify the checkout complete page is shown (e.g. title contains "Checkout: Complete!")
-20. Verify the page shows an order confirmation (e.g. "Thank you for your order!")
+14. Click the "Finish" button
+15. Verify the checkout complete page is shown (e.g. title contains "Checkout: Complete!")
+16. Verify the page shows an order confirmation (e.g. "Thank you for your order!")
 
-21. Click the "Back Home" button
-22. Verify the user returns to the inventory/products page
+17. Click the "Back Home" button
+18. Verify the user returns to the inventory/products page

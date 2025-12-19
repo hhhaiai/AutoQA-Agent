@@ -2,7 +2,7 @@ import { readdirSync, statSync, type Dirent } from 'node:fs'
 import { extname, join, relative, resolve, sep } from 'node:path'
 
 export type DiscoverSpecsResult =
-  | { ok: true; specs: string[] }
+  | { ok: true; specs: string[]; inputIsDirectory: boolean }
   | { ok: false; error: { code: string; message: string; cause?: unknown } }
 
 function compareDeterministic(a: string, b: string): number {
@@ -86,7 +86,7 @@ function collectMarkdownFilesIterative(rootDir: string): DiscoverSpecsResult {
     }
   }
 
-  return { ok: true, specs: results }
+  return { ok: true, specs: results, inputIsDirectory: true }
 }
 
 export function discoverMarkdownSpecs(fileOrDir: string): DiscoverSpecsResult {
@@ -118,7 +118,7 @@ export function discoverMarkdownSpecs(fileOrDir: string): DiscoverSpecsResult {
       }
     }
 
-    return { ok: true, specs: [inputPath] }
+    return { ok: true, specs: [inputPath], inputIsDirectory: false }
   }
 
   if (stats.isDirectory()) {
@@ -141,7 +141,7 @@ export function discoverMarkdownSpecs(fileOrDir: string): DiscoverSpecsResult {
       return compareDeterministic(ak, bk)
     })
 
-    return { ok: true, specs: sorted }
+    return { ok: true, specs: sorted, inputIsDirectory: true }
   }
 
   return {

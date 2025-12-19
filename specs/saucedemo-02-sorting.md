@@ -7,15 +7,10 @@
 
 ## Steps
 
-1. Navigate to /
-2. Fill the "Username" field with {{USERNAME}}
-3. Fill the "Password" field with {{PASSWORD}}
-4. Click the "Login" button
-5. Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
-
-6. Verify the inventory page shows a list of products, each with name/price and an "Add to cart" button
-7. Verify the sort dropdown is present (e.g. allows sorting by Name / Price)
-8. Click the sort dropdown and select "Price (low to high)"
-9. Verify the product list is sorted by ascending price
-10. Click the sort dropdown and select "Name (Z to A)"
-11. Verify the product list is sorted by name descending
+1. include: login
+2. Verify the inventory page shows a list of products, each with name/price and an "Add to cart" button
+3. Verify the sort dropdown is present (e.g. allows sorting by Name / Price)
+4. Click the sort dropdown and select "Price (low to high)"
+5. Verify the product list is sorted by ascending price
+6. Click the sort dropdown and select "Name (Z to A)"
+7. Verify the product list is sorted by name descending

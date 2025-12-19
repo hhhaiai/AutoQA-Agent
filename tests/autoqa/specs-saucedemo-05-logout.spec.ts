@@ -1,14 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+import { loadEnvFiles, getEnvVar } from './autoqa-env'
 
-const baseUrl = 'https://www.saucedemo.com';
+loadEnvFiles()
+
+const baseUrl = getEnvVar('AUTOQA_BASE_URL')
+const password = getEnvVar('AUTOQA_PASSWORD')
+const username = getEnvVar('AUTOQA_USERNAME')
 
 test('saucedemo 05 logout', async ({ page }) => {
   // Step 1: Navigate to /
   await page.goto(new URL('/', baseUrl).toString());
-  // Step 2: Fill the "Username" field with standard_user
-  await page.getByPlaceholder('Username').fill('standard_user');
-  // Step 3: Fill the "Password" field with secret_sauce
-  await page.getByPlaceholder('Password').fill('secret_sauce');
+  // Step 2: Fill the "Username" field with AUTOQA_USERNAME
+  await page.getByPlaceholder('Username').fill(username);
+  // Step 3: Fill the "Password" field with AUTOQA_PASSWORD
+  await page.getByPlaceholder('Password').fill(password);
   // Step 4: Click the "Login" button
   await page.locator('#login-button').click();
   // Step 5: Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
@@ -32,4 +37,7 @@ test('saucedemo 05 logout', async ({ page }) => {
   const locator10_2 = page.getByPlaceholder('Password');
   await expect(locator10_2).toHaveCount(1);
   await expect(locator10_2).toBeVisible();
-});
+  const locator10_3 = page.locator('#login-button');
+  await expect(locator10_3).toHaveCount(1);
+  await expect(locator10_3).toBeVisible();
+})

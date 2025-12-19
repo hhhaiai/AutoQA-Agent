@@ -11,8 +11,10 @@ import { writeOutLine } from '../output.js'
 import { discoverMarkdownSpecs } from '../../specs/discover.js'
 import { validateRunArgs } from '../../runner/validate-run-args.js'
 import { runSpecs } from '../../runner/run-specs.js'
-import { parseMarkdownSpec } from '../../markdown/parse-markdown-spec.js'
+import type { ParsedSpec } from '../../runner/run-specs.js'
+import { parseMarkdownSpec, classifyStepKind } from '../../markdown/parse-markdown-spec.js'
 import { renderMarkdownTemplate } from '../../markdown/template.js'
+import { expandIncludes, getIncludeRoot } from '../../markdown/include.js'
 import type { MarkdownSpec } from '../../markdown/spec-types.js'
 import { runAgent } from '../../agent/run-agent.js'
 import { probeAgentSdkAuth, type AgentSdkAuthProbeResult } from '../../auth/probe.js'
@@ -148,7 +150,9 @@ export function registerRunCommand(program: Command) {
         writeOutLine(writeErr, `node=${process.version}`)
       }
 
-      const parsedSpecs: Array<{ specPath: string; spec: MarkdownSpec }> = []
+      const parsedSpecs: ParsedSpec[] = []
+
+      const includeRoot = getIncludeRoot(inputPath, result.inputIsDirectory)
 
       for (const specPath of result.specs) {
         let markdown: string
@@ -166,21 +170,8 @@ export function registerRunCommand(program: Command) {
 
         let parsed: ReturnType<typeof parseMarkdownSpec>
 
-        const rendered = renderMarkdownTemplate(markdown, {
-          BASE_URL: validated.value.baseUrl,
-          LOGIN_BASE_URL: validated.value.loginBaseUrl,
-          ENV: resolvedEnvName,
-          USERNAME: process.env.AUTOQA_USERNAME,
-          PASSWORD: process.env.AUTOQA_PASSWORD,
-        })
-
-        if (!rendered.ok) {
-          program.error(`Invalid spec template: ${specPath}\n${rendered.message}`, { exitCode: 2 })
-          return
-        }
-
         try {
-          parsed = parseMarkdownSpec(rendered.value)
+          parsed = parseMarkdownSpec(markdown)
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err)
           program.error(`Failed to parse spec: ${specPath}\n${message}`, { exitCode: 2 })
@@ -195,7 +186,78 @@ export function registerRunCommand(program: Command) {
           return
         }
 
-        parsedSpecs.push({ specPath, spec: parsed.value, rawContent: markdown })
+        const stepTexts = parsed.value.steps.map((s) => s.text)
+
+        const readIncludeFile = (path: string): string | null => {
+          try {
+            return readFileSync(path, 'utf8')
+          } catch {
+            return null
+          }
+        }
+
+        const expandResult = expandIncludes(stepTexts, includeRoot, readIncludeFile)
+
+        if (!expandResult.ok) {
+          program.error(
+            `Include expansion failed in spec: ${specPath}\ncode=${expandResult.error.code}\n${expandResult.error.message}`,
+            { exitCode: 2 },
+          )
+          return
+        }
+
+        const expandedStepTexts = expandResult.value
+
+        const templateVars = {
+          BASE_URL: validated.value.baseUrl,
+          LOGIN_BASE_URL: validated.value.loginBaseUrl,
+          ENV: resolvedEnvName,
+          USERNAME: process.env.AUTOQA_USERNAME,
+          PASSWORD: process.env.AUTOQA_PASSWORD,
+        }
+
+        const templateCheckWholeSpec = renderMarkdownTemplate(markdown, templateVars)
+        if (!templateCheckWholeSpec.ok) {
+          program.error(`Invalid spec template: ${specPath}\n${templateCheckWholeSpec.message}`, { exitCode: 2 })
+          return
+        }
+
+        const rawExpandedContentForExport =
+          `## Preconditions\n` +
+          parsed.value.preconditions.map((t) => `- ${t}`).join('\n') +
+          `\n\n## Steps\n` +
+          expandedStepTexts.map((t, idx) => `${idx + 1}. ${t}`).join('\n') +
+          `\n`
+
+        const allTextsToRender = [...parsed.value.preconditions, ...expandedStepTexts]
+        const combinedMarkdown = allTextsToRender.join('\n')
+        const templateCheck = renderMarkdownTemplate(combinedMarkdown, templateVars)
+
+        if (!templateCheck.ok) {
+          program.error(`Invalid spec template: ${specPath}\n${templateCheck.message}`, { exitCode: 2 })
+          return
+        }
+
+        const renderedSteps = expandedStepTexts.map((text) => {
+          const rendered = renderMarkdownTemplate(text, templateVars)
+          return rendered.ok ? rendered.value : text
+        })
+
+        const renderedPreconditions = parsed.value.preconditions.map((text) => {
+          const rendered = renderMarkdownTemplate(text, templateVars)
+          return rendered.ok ? rendered.value : text
+        })
+
+        const finalSpec: MarkdownSpec = {
+          preconditions: renderedPreconditions,
+          steps: renderedSteps.map((text, idx) => ({
+            index: idx + 1,
+            text,
+            kind: classifyStepKind(text),
+          })),
+        }
+
+        parsedSpecs.push({ specPath, spec: finalSpec, rawContent: rawExpandedContentForExport })
       }
 
       if (validated.value.debug) {

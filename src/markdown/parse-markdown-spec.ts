@@ -70,7 +70,7 @@ function collectListItemTexts(listNode: any): string[] {
   return texts
 }
 
-function classifyStepKind(text: string): MarkdownSpecStepKind {
+export function classifyStepKind(text: string): MarkdownSpecStepKind {
   const t = text.trim()
   const lower = t.toLowerCase()
 

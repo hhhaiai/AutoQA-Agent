@@ -58,6 +58,7 @@ development_status:
   2-7-logging-observability-structured: done
   2-8-ax-aria-snapshot: done
   2-9-playwright-trace-recording-retention: done
+  2-10-markdown-include-reusable-step-library: done
   epic-2-retrospective: optional
 
   epic-3: done

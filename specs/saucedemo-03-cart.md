@@ -8,29 +8,25 @@
 
 ## Steps
 
-1. Navigate to /
-2. Fill the "Username" field with {{USERNAME}}
-3. Fill the "Password" field with {{PASSWORD}}
-4. Click the "Login" button
-5. Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
+1. include: login
 
-6. (Optional) Open the left menu (hamburger/menu button)
-7. (Optional) Click "Reset App State"
-8. Verify the cart badge is not shown (or shows 0)
+2. (Optional) Open the left menu (hamburger/menu button)
+3. (Optional) Click "Reset App State"
+4. Verify the cart badge is not shown (or shows 0)
 
-9. Click "Add to cart" for any product
-10. Verify the button for that product changes to "Remove"
-11. Verify the cart icon badge count becomes 1
+5. Click "Add to cart" for any product
+6. Verify the button for that product changes to "Remove"
+7. Verify the cart icon badge count becomes 1
 
-12. Click "Add to cart" for another product
-13. Verify the cart icon badge count becomes 2
+8. Click "Add to cart" for another product
+9. Verify the cart icon badge count becomes 2
 
-14. Click the cart icon
-15. Verify the cart page shows "Your Cart" and lists the selected products
+10. Click the cart icon
+11. Verify the cart page shows "Your Cart" and lists the selected products
 
-16. Click "Remove" for one of the items in the cart
-17. Verify the removed item disappears from the cart list
-18. Verify the cart icon badge count decreases by 1
+12. Click "Remove" for one of the items in the cart
+13. Verify the removed item disappears from the cart list
+14. Verify the cart icon badge count decreases by 1
 
-19. Click "Continue Shopping"
-20. Verify the user returns to the inventory/products page
+15. Click "Continue Shopping"
+16. Verify the user returns to the inventory/products page
