@@ -221,6 +221,10 @@ export async function runExploreAgent(options: ExploreAgentOptions): Promise<Exp
   }
 
   // Create MCP server for browser tools
+  if (debug) {
+    console.error('[explore] Creating MCP server for browser tools...')
+  }
+
   const server = createBrowserToolsMcpServer({
     page,
     baseUrl: config.baseUrl,
@@ -232,6 +236,7 @@ export async function runExploreAgent(options: ExploreAgentOptions): Promise<Exp
   })
 
   if (debug) {
+    console.error('[explore] MCP server created successfully')
     process.stderr.write(`[explore] mcp=browser (navigate/click/fill/snapshot)\n`)
   }
 
@@ -265,8 +270,18 @@ export async function runExploreAgent(options: ExploreAgentOptions): Promise<Exp
       },
     })
 
+    if (debug) {
+      console.error('[explore] Starting to iterate over response...')
+    }
+
+    let messageCount = 0
     for await (const message of response as any) {
+      messageCount++
       turnCount++
+
+      if (debug && messageCount <= 5) {
+        console.error(`[explore] Message ${messageCount}:`, JSON.stringify(message, null, 2))
+      }
 
       // Check guardrails
       if (turnCount >= guardrailLimits.maxAgentTurns) {

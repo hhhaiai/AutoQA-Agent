@@ -37,6 +37,10 @@ export async function explore(options: ExploreOptions): Promise<ExplorationResul
   const context = await browser.newContext()
   const page = await context.newPage()
 
+  if (debug) {
+    console.error('[explore] Browser context and page created successfully')
+  }
+
   try {
     // Delegate to Agent-driven exploration
     // The Agent will:
