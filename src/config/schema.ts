@@ -17,12 +17,26 @@ export const planGuardrailsSchema = z.object({
 
 export type PlanGuardrails = z.infer<typeof planGuardrailsSchema>
 
+export const authConfigSchema = z.object({
+  loginUrl: z.string().url().optional(),
+  usernameVar: z.string().optional(),
+  passwordVar: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  extra: z.record(z.unknown()).optional(),
+})
+
+export type AuthConfig = z.infer<typeof authConfigSchema>
+
 export const planConfigSchema = z.object({
   baseUrl: z.string().url().optional(),
   maxDepth: z.number().int().min(0).max(10).optional(),
   maxPages: z.number().int().positive().optional(),
+  includePatterns: z.array(z.string()).optional(),
+  excludePatterns: z.array(z.string()).optional(),
   testTypes: z.array(z.enum(['functional', 'form', 'navigation', 'responsive', 'boundary', 'security'])).optional(),
   guardrails: planGuardrailsSchema.optional(),
+  auth: authConfigSchema.optional(),
 })
 
 export type PlanConfigFromFile = z.infer<typeof planConfigSchema>

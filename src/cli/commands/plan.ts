@@ -7,15 +7,13 @@ import { Command } from 'commander'
 import { randomUUID } from 'node:crypto'
 
 import { createBrowser } from '../../browser/create-browser.js'
-import { readConfig } from '../../config/read.js'
+import { readConfig, loadPlanConfig } from '../../config/read.js'
 import { createLogger } from '../../logging/index.js'
 import { explore } from '../../plan/explore.js'
 import { writeExplorationResult } from '../../plan/output.js'
 import { generateTestPlan } from '../../plan/orchestrator.js'
 import type { PlanConfig, GuardrailConfig } from '../../plan/types.js'
 
-const DEFAULT_MAX_DEPTH = 3
-const VALID_TEST_TYPES = ['functional', 'form', 'navigation', 'responsive', 'boundary', 'security'] as const
 const GUARDRAIL_EXIT_CODE = 10
 const CONFIG_ERROR_EXIT_CODE = 2
 const RUNTIME_ERROR_EXIT_CODE = 1
@@ -45,14 +43,6 @@ function validateUrl(value: string): string {
   }
 }
 
-function validateTestTypes(types: string): string[] {
-  const typeList = types.split(',').map((t: string) => t.trim().toLowerCase())
-  const invalid = typeList.filter(t => !VALID_TEST_TYPES.includes(t as any))
-  if (invalid.length > 0) {
-    throw new Error(`Invalid test types: ${invalid.join(', ')}. Valid types: ${VALID_TEST_TYPES.join(', ')}`)
-  }
-  return typeList
-}
 
 function sanitizeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
@@ -63,43 +53,8 @@ function sanitizeErrorMessage(error: unknown): string {
     .replace(/secret[=:]\s*[^\s&]+/gi, 'secret=***')
 }
 
-function mergeConfigWithOptions(fileConfig: any, options: any): { config: PlanConfig; guardrails: GuardrailConfig } {
-  const planConfig = fileConfig?.plan || {}
-  
-  const guardrails: GuardrailConfig = {}
-  if (options.maxAgentTurns) guardrails.maxAgentTurnsPerRun = options.maxAgentTurns
-  else if (planConfig.guardrails?.maxAgentTurnsPerRun) guardrails.maxAgentTurnsPerRun = planConfig.guardrails.maxAgentTurnsPerRun
-  
-  if (options.maxSnapshots) guardrails.maxSnapshotsPerRun = options.maxSnapshots
-  else if (planConfig.guardrails?.maxSnapshotsPerRun) guardrails.maxSnapshotsPerRun = planConfig.guardrails.maxSnapshotsPerRun
-  
-  if (options.maxPages) guardrails.maxPagesPerRun = options.maxPages
-  else if (planConfig.guardrails?.maxPagesPerRun) guardrails.maxPagesPerRun = planConfig.guardrails.maxPagesPerRun
-  
-  const baseUrl = options.url || planConfig.baseUrl
-  if (!baseUrl) {
-    throw new Error('baseUrl is required (provide via --url or autoqa.config.json plan.baseUrl)')
-  }
-  
-  let testTypes: PlanConfig['testTypes'] = planConfig.testTypes
-  if (options.testTypes) {
-    testTypes = validateTestTypes(options.testTypes) as PlanConfig['testTypes']
-  }
-  
-  const config: PlanConfig = {
-    baseUrl,
-    maxDepth: options.depth ?? planConfig.maxDepth ?? DEFAULT_MAX_DEPTH,
-    maxPages: options.maxPages ?? planConfig.maxPages,
-    testTypes,
-    guardrails: Object.keys(guardrails).length > 0 ? guardrails : undefined,
-    auth: options.loginUrl ? {
-      loginUrl: options.loginUrl,
-      username: options.username,
-      password: options.password,
-    } : undefined,
-  }
-  
-  return { config, guardrails }
+function mergeConfigWithOptions(fileConfig: any, options: any): PlanConfig {
+  return loadPlanConfig(fileConfig, options)
 }
 
 type ConfigResult = { ok: true; config: PlanConfig } | { ok: false; exitCode: number }
@@ -112,8 +67,8 @@ function loadAndMergeConfig(cwd: string, options: any): ConfigResult {
   }
 
   try {
-    const merged = mergeConfigWithOptions(configResult.config, options)
-    return { ok: true, config: merged.config }
+    const config = mergeConfigWithOptions(configResult.config, options)
+    return { ok: true, config }
   } catch (error) {
     console.error(`❌ ${sanitizeErrorMessage(error)}`)
     return { ok: false, exitCode: CONFIG_ERROR_EXIT_CODE }
@@ -277,8 +232,7 @@ export function registerPlanCommand(program: Command): void {
 
       let config: PlanConfig
       try {
-        const merged = mergeConfigWithOptions(configResult.config, options)
-        config = merged.config
+        config = mergeConfigWithOptions(configResult.config, options)
       } catch (error) {
         console.error(`❌ ${error instanceof Error ? error.message : String(error)}`)
         process.exit(2)
