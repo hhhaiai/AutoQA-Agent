@@ -1,6 +1,6 @@
 # Story 7.3: `autoqa plan` 命令编排（探索 + 规划 + 用例生成）
 
-Status: review
+Status: done
 
 ## Story
 
