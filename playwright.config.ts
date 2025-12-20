@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['tests/autoqa/**/*.spec.ts', 'polyv-tests/**/*.spec.ts'],
+  testMatch: ['tests/autoqa/**/*.spec.ts', 'polyv-tests/autoqa/**/*.spec.ts'],
   use: {
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai',

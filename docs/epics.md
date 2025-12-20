@@ -27,8 +27,11 @@ FR9: 稳定定位器沉淀：当 Agent 成功点击/填表某个元素时，系�
 FR10: 提供结构化页面表示：系统应支持获取页面的可访问性结构化快照（AX/ARIA snapshot），作为比截图更高效的页面理解输入，用于元素定位、自愈与调试。
 FR11: 提供可回放调试产物：系统应支持按 spec 录制 Playwright trace（含网络/DOM/操作时间线），并将 trace 作为运行产物落盘，便于失败复现与调试。
 FR12: 环境与测试数据配置：支持按环境加载（如 `.env.test`/`.env.prod`）并为 spec 提供可替换变量（例如 `BASE_URL`/`LOGIN_BASE_URL`），同时提供不在 Markdown 用例中硬编码敏感信息（如账号/密码）的机制。
-FR13: Playwright Test 导出用例支持“登录态复用/会话持久化”：仅当 Markdown spec 的 `## Preconditions` 包含严格声明 `Auth: required|none` 且值为 `required` 时，导出的用例才启用 `storageState`；专门验证登录流程的用例必须在**未预置登录态**下运行。
-FR14: Markdown spec 支持“可复用步骤库 / include”：步骤列表中允许通过 `include: <name>` 引用外部步骤文件（例如 `include: login`），以避免 02-05 这类用例重复维护相同的登录步骤。
+FR13: Playwright Test 导出用例支持"登录态复用/会话持久化"：仅当 Markdown spec 的 `## Preconditions` 包含严格声明 `Auth: required|none` 且值为 `required` 时，导出的用例才启用 `storageState`；专门验证登录流程的用例必须在**未预置登录态**下运行。
+FR14: Markdown spec 支持"可复用步骤库 / include"：步骤列表中允许通过 `include: <name>` 引用外部步骤文件（例如 `include: login`），以避免 02-05 这类用例重复维护相同的登录步骤。
+FR15: 智能测试规划器：自动探索 Web 应用并生成测试计划，包括页面发现、表单分析、工作流识别和全面的测试用例生成。
+FR16: 测试用例自动生成：基于应用结构智能生成功能测试、表单验证、导航测试、响应式测试、边界条件和安全性测试等多种类型的测试用例。
+FR17: 配置化探索策略：支持自定义探索深度、排除模式、认证信息等，灵活控制测试计划生成过程。
 
 ### NonFunctional Requirements
 
@@ -68,6 +71,9 @@ FR11: Epic 2 - Playwright trace 录制与落盘
 FR12: Epic 5 - 环境与测试数据配置（多环境 + 账号/密码等）
 FR13: Epic 6 - Playwright Test 导出用例的登录态复用/会话持久化
 FR14: Epic 2 - Markdown include 可复用步骤库
+FR15: Epic 7 - 智能测试规划器核心功能
+FR16: Epic 7 - 测试用例智能生成
+FR17: Epic 7 - 配置化探索策略
 
 ## Epic List
 
@@ -564,6 +570,151 @@ So that 导出 `@playwright/test` 时可以统一使用 `getEnvVar('AUTOQA_...')
 用户完成该 Epic 后，运行 `@playwright/test` 导出的用例时可在**同一次 run** 内复用登录态（避免每个用例重复登录），同时保留默认的隔离性（每用例独立 context）。是否启用登录态复用由 Markdown spec 的 `## Preconditions` 声明驱动；登录用例本身不使用预置登录态。
 
 **FRs covered:** FR13
+
+## Epic 7: Agent 驱动智能测试规划器（基于 snapshot 的自动化测试计划生成）
+
+用户完成该 Epic 后，可以使用 `autoqa plan` 命令，让 Claude Agent 在浏览器中主动探索应用（基于 screenshot + AX/ARIA snapshot 等统一感知输入），自动理解页面结构与典型业务流，并直接生成符合 AutoQA 规范的 Markdown 测试用例。探索逻辑、测试类型选择、页面理解等“业务智能”主要由 Agent 负责，而不是写死在 TypeScript 代码中，从而减少针对特定页面/应用写补丁的需求。
+
+**FRs covered:** FR15, FR16, FR17
+
+### Story 7.1: Agent 驱动的应用探索 Session（`autoqa plan explore`）
+
+As a QA 工程师,
+I want 使用 `autoqa plan explore` 触发一个由 Agent 驱动的探索 Session,
+So that Agent 可以基于页面 snapshot 主动决定去哪儿看、看什么，并沉淀成可复用的应用结构视图。
+
+**FRs covered:** FR15
+
+Tech Spec: `docs/sprint-artifacts/7-1-app-exploration-engine.md`
+
+**Acceptance Criteria:**
+
+**Given** 提供了应用 URL
+**When** 运行 `autoqa plan explore -u https://example.com -d 3`
+**Then** 探索过程中的导航/点击/等待等具体动作均由 Agent 通过浏览器工具调用驱动
+**And** TypeScript 代码仅提供 `navigate/click/fill/scroll/wait/snapshot` 等基础工具，不再硬编码页面特定的探索逻辑
+**And** 每次 Agent 请求观察页面时，系统都会生成与 `autoqa run` 一致格式的 snapshot（至少包含 screenshot + AX/ARIA snapshot + URL + 标题）
+
+**Given** 探索结束
+**When** 查看 `.autoqa/runs/<runId>/plan-explore/`
+**Then** 至少包含：
+  - `explore-graph.json`：页面节点 + 导航关系
+  - `explore-elements.json`：每个页面的交互元素清单
+  - `explore-transcript.jsonl`：Agent 探索过程的工具调用与思考摘要
+**And** 这些产物可作为 Story 7.2 用例生成器的直接输入
+
+**Given** 应用需要登录
+**When** 通过配置或参数提供登录入口与凭据占位符
+**Then** Agent 应能在探索早期完成登录步骤，并在同一 Browser Context 中继续后续页面探索
+**And** 登录失败时应以退出码 `1` 结束，并在日志与探索产物中附带 snapshot 与错误说明
+
+### Story 7.2: Agent 驱动的智能测试用例生成器
+
+As a QA 工程师,
+I want 基于探索结果和关键页面 snapshot，让 Agent 自动生成覆盖主要业务流和边界场景的 Markdown 测试用例,
+So that 我可以快速获得高质量的测试计划，而不需要为每种页面类型写规则引擎。
+
+**FRs covered:** FR16
+
+Tech Spec: `docs/sprint-artifacts/7-2-intelligent-test-case-generator.md`
+
+**Acceptance Criteria:**
+
+**Given** 已完成一次 `autoqa plan explore` 并生成探索产物
+**When** 触发用例生成流程（例如 `autoqa plan generate` 或 `autoqa plan --generate`）
+**Then** TypeScript 代码仅负责将 `explore-graph`、关键页面 snapshot 及 `PlanConfig` 作为上下文传递给 Agent
+**And** 具体哪些页面需要哪些测试类型（功能/表单/导航/响应式/边界/安全性）由 Agent 决策，而不是在 TypeScript 中硬编码规则
+
+**Given** 用例生成完成
+**When** 查看 `.autoqa/runs/<runId>/plan/specs/`
+**Then** 每个生成的用例文件必须：
+  - 符合 AutoQA Markdown 结构（包含 `## Preconditions` 与有序步骤列表）
+  - 使用自然语言步骤 + 明确的“预期结果/断言”描述
+  - 不直接写死敏感数据，而是通过占位符（如 `{{USERNAME}}`）引用
+
+**Given** 探索结果中包含表单页面/导航菜单/响应式布局线索
+**When** 生成测试计划
+**Then** 生成的用例至少覆盖：
+  - 基础功能测试（页面访问、元素交互）
+  - 表单测试（成功提交、验证失败、必填字段）
+  - 导航测试（内部链接、菜单流转）
+  - 响应式测试（通过 Agent 推理给出 viewport 建议）
+  - 边界条件测试（长文本、快速操作、网络延迟）
+  - 基础安全性测试（至少包含 XSS 输入场景）
+
+### Story 7.3: `autoqa plan` 命令编排（探索 + 规划 + 用例生成）
+
+As a QA 工程师,
+I want 使用 `autoqa plan` 命令一键完成“探索 + 规划 + 用例生成”,
+So that 我可以在不同项目上快速得到可直接执行的测试计划。
+
+**FRs covered:** FR15, FR16, FR17
+
+Tech Spec: `docs/sprint-artifacts/7-3-plan-command-implementation.md`
+
+**Acceptance Criteria:**
+
+**Given** 需要为应用生成测试计划
+**When** 运行 `autoqa plan -u https://example.com`
+**Then** CLI 应按顺序触发：
+  - Story 7.1 定义的 Agent 探索 Session
+  - Story 7.2 定义的用例生成流程
+**And** 运行结束后在 `.autoqa/runs/<runId>/plan/` 下产生探索产物、规划产物与生成的 Markdown specs
+
+**Given** 存在 `autoqa.config.json` 中的 `plan` 配置段
+**When** 运行 `autoqa plan`
+**Then** CLI 应从配置中读取基础参数（如 `baseUrl`、`maxDepth`、test types）并传递给 orchestrator 与 Agent
+**And** 日志中有清晰的阶段划分（explore/generate），便于排障与性能分析
+
+**Given** 探索或生成过程中触发 guardrail（如 `maxAgentTurnsPerRun` 或 `maxSnapshotsPerRun`）
+**When** 本次 `autoqa plan` 结束
+**Then** 应以退出码 `1` 结束（表示规划不完整），并在总结产物中标记被 guardrail 截断的原因
+
+### Story 7.4: 配置化探索与生成策略
+
+As a QA 工程师,
+I want 通过配置文件与命令行参数自定义探索和测试生成规则,
+So that 我可以根据不同项目的需求调整规划器的行为与覆盖范围。
+
+**FRs covered:** FR17
+
+Tech Spec: `docs/sprint-artifacts/7-4-configurable-exploration-strategy.md`
+
+**Acceptance Criteria:**
+
+**Given** 需要定制探索行为
+**When** 创建 `autoqa.planner.config.json` 或在 `autoqa.config.json` 中新增 `plan` 段
+**Then** 至少支持配置：
+  - 探索深度 `maxDepth` 与最大页面数 `maxPages`
+  - URL 包含/排除模式（如 `/admin/*`、`/api/*`）
+  - 需要启用的测试类型集合（功能/表单/导航/响应式/边界/安全性）
+  - 登录/认证相关配置（登录 URL、凭据占位符等）
+
+**Given** 同时提供配置文件和命令行参数
+**When** 运行 `autoqa plan ...`
+**Then** 命令行参数应优先于配置文件中的对应设置
+**And** 最终生效的合并配置应被记录到本次 run 的总结产物中（例如 `plan-summary.json`）
+
+### Story 7.5: 与现有执行/导出工具链的集成
+
+As a 开发者,
+I want 生成的测试计划可以直接作为 `autoqa run` 与 Epic 4 导出流水线的上游输入,
+So that 规划、执行与导出 Playwright Test 可以无缝衔接。
+
+**FRs covered:** FR15, FR16
+
+Tech Spec: `docs/sprint-artifacts/7-5-integration-with-existing-toolchain.md`
+
+**Acceptance Criteria:**
+
+**Given** 使用 `autoqa plan` 生成了测试计划（若干 Markdown specs）
+**When** 运行 `autoqa run <生成的目录或文件>`
+**Then** 应无需修改即可执行，且执行模型与手写 spec 完全一致（同样支持截图、自愈、IR 记录与 Playwright Test 导出）
+
+**Given** 生成的 spec 中使用了模板变量与环境变量（例如 `{{BASE_URL}}`、`{{LOGIN_BASE_URL}}`、`{{USERNAME}}`）
+**When** 通过 Epic 5 配置的环境变量运行 `autoqa run`
+**Then** 变量替换与登录态复用等行为应与手写 spec 保持一致
+**And** Epic 6 中关于登录态复用的约束同样适用于规划生成的用例
 
 ### Story 6.1: 生成并复用 storageState（登录一次）
 

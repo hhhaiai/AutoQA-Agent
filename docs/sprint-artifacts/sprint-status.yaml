@@ -34,7 +34,7 @@
 # - SM typically drafts next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2025-12-15T21:54:43+08:00
+generated: 2025-12-20T22:18:00+08:00
 project: AutoQA-Agent
 project_key: autoqa-agent
 tracking_system: file-system
@@ -79,3 +79,17 @@ development_status:
   5-3-markdown-template-vars: done
   5-4-sensitive-testdata-injection: done
   epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-generate-and-reuse-storagestate: backlog
+  6-2-spec-declares-auth-requirement: backlog
+  6-3-login-test-exception: backlog
+  epic-6-retrospective: optional
+
+  epic-7: in-progress
+  7-1-app-exploration-engine: ready-for-dev
+  7-2-intelligent-test-case-generator: backlog
+  7-3-plan-command-implementation: backlog
+  7-4-configurable-exploration-strategy: backlog
+  7-5-integration-with-existing-toolchain: backlog
+  epic-7-retrospective: optional
