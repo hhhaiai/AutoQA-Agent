@@ -222,6 +222,12 @@ The generated test cases MUST be executable by the AutoQA runner. Follow these r
 - Never include actual credentials in test cases
 - Reference environment variables in preconditions
 
+**Login Requirement Flag (requiresLogin):**
+- For each test case, you MUST include a boolean field "requiresLogin" in the JSON output.
+- Set "requiresLogin": true when the primary page(s) or actions under test require the user to be logged in or authenticated.
+- Set "requiresLogin": false when the test case can be executed while logged out or as an anonymous user.
+- This flag controls whether the markdown generator will automatically insert an include step (for example: "include: login" or "include: <plan.loginStepsSpec>") at the beginning of the Steps section.
+
 ## 4. Output Format
 
 Respond with JSON in the following shape, and nothing else:
@@ -235,6 +241,7 @@ Respond with JSON in the following shape, and nothing else:
       "name": "Test case name",
       "type": "functional" | "form" | "navigation" | "responsive" | "boundary" | "security",
       "priority": "p0" | "p1" | "p2",
+      "requiresLogin": true | false,
       "relatedPageIds": ["page-id-1", "page-id-2"],
       "markdownPath": "relative/path/to/spec.md",
       "preconditions": [
@@ -318,6 +325,10 @@ function normalizeCase(testCase: any, index: number): TestCasePlan {
       .filter((v): v is { description: string; expectedResult: string } => v !== null)
     : undefined
 
+  const requiresLogin = typeof testCase?.requiresLogin === 'boolean'
+    ? testCase.requiresLogin
+    : undefined
+
   return {
     id,
     name,
@@ -327,6 +338,7 @@ function normalizeCase(testCase: any, index: number): TestCasePlan {
     markdownPath,
     preconditions,
     steps,
+    requiresLogin,
   }
 }
 
