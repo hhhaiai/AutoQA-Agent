@@ -230,9 +230,11 @@ describe('plan/output', () => {
       expect(markdown).toContain('## Preconditions')
       expect(markdown).toContain('- User has a valid account')
       expect(markdown).toContain('## Steps')
-      expect(markdown).toMatch(/1\. Open the login page/)
+      // Now includes login include step as step 1
+      expect(markdown).toMatch(/1\. include: login/)
+      expect(markdown).toMatch(/2\. Open the login page/)
       expect(markdown).toMatch(/- Expected: Login form is visible/)
-      expect(markdown).toMatch(/2\. Fill username \{\{USERNAME}} and password \{\{PASSWORD}} and submit/)
+      expect(markdown).toMatch(/3\. Fill username \{\{USERNAME}} and password \{\{PASSWORD}} and submit/)
       expect(markdown).toMatch(/- Expected: User is redirected to dashboard/)
     })
 

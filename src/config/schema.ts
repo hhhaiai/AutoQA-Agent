@@ -37,6 +37,14 @@ export const planConfigSchema = z.object({
   testTypes: z.array(z.enum(['functional', 'form', 'navigation', 'responsive', 'boundary', 'security'])).optional(),
   guardrails: planGuardrailsSchema.optional(),
   auth: authConfigSchema.optional(),
+  /**
+   * Login steps spec path for Planner-generated cases that require authentication.
+   * Relative to the shared steps library root (see Tech Spec ts-8-1-8-3 §6.3).
+   * Examples:
+   * - "login.md" → Planner emits `include: login` and runner resolves `steps/login.md`.
+   * - "polyv/login.md" → Planner emits `include: polyv/login.md` and runner resolves `steps/polyv/login.md`.
+   */
+  loginStepsSpec: z.string().optional(),
 })
 
 export type PlanConfigFromFile = z.infer<typeof planConfigSchema>

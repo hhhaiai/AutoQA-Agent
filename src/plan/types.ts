@@ -35,6 +35,16 @@ export type PlanConfig = {
   testTypes?: ('functional' | 'form' | 'navigation' | 'responsive' | 'boundary' | 'security')[]
   guardrails?: GuardrailConfig
   auth?: AuthConfig
+  /**
+   * Logical name or relative path for the login steps spec used by Planner-generated cases
+   * that require authentication. This value is emitted verbatim in `include: <name>` steps,
+   * and resolved by the runner against the shared steps library root.
+   *
+   * Examples:
+   * - "login" → `include: login` → steps/login.md
+   * - "polyv/login.md" → `include: polyv/login.md` → steps/polyv/login.md
+   */
+  loginStepsSpec?: string
 }
 
 /**

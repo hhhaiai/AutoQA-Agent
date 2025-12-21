@@ -54,9 +54,13 @@ describe('Plan Integration with Run and Export', () => {
 
       expect(parseResult.value.preconditions).toHaveLength(2)
       expect(parseResult.value.preconditions[0]).toBe('User has a valid account')
-      expect(parseResult.value.steps).toHaveLength(5)
-      expect(parseResult.value.steps[0].text).toContain('Navigate to')
-      expect(parseResult.value.steps[4].kind).toBe('assertion')
+      // Now includes login include step + 5 original steps = 6 total
+      expect(parseResult.value.steps).toHaveLength(6)
+      // First step is the auto-inserted login include
+      expect(parseResult.value.steps[0].text).toContain('include: login')
+      // Second step is the first original step
+      expect(parseResult.value.steps[1].text).toContain('Navigate to')
+      expect(parseResult.value.steps[5].kind).toBe('assertion')
     })
 
     it('should generate specs with template variables that preserve {{VAR}} format', () => {
@@ -91,8 +95,10 @@ describe('Plan Integration with Run and Export', () => {
       expect(parseResult.ok).toBe(true)
       if (!parseResult.ok) return
 
-      expect(parseResult.value.steps[0].text).toContain('{{BASE_URL}}')
-      expect(parseResult.value.steps[1].text).toContain('{{LOGIN_BASE_URL}}')
+      // Steps now start with include: login, then the original steps
+      expect(parseResult.value.steps[0].text).toContain('include: login')
+      expect(parseResult.value.steps[1].text).toContain('{{BASE_URL}}')
+      expect(parseResult.value.steps[2].text).toContain('{{LOGIN_BASE_URL}}')
     })
 
     it('should generate specs with default preconditions when none provided', () => {

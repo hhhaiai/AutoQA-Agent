@@ -22,6 +22,7 @@ export type ExpandIncludesResult =
 const INCLUDE_PATTERN = /^\s*include\s*:\s*(.+?)\s*$/i
 
 const VALID_NAME_PATTERN = /^[A-Za-z0-9_-]+$/
+const VALID_PATH_PATTERN = /^[A-Za-z0-9_\/-]+(\.md)?$/
 
 export function isIncludeStep(stepText: string): boolean {
   return INCLUDE_PATTERN.test(stepText)
@@ -33,6 +34,13 @@ export function parseIncludeName(stepText: string): string | null {
   return match[1].trim()
 }
 
+/**
+ * Validates and normalizes an include name/path.
+ * Supports:
+ * - Simple names: "login" → "login.md"
+ * - Relative paths: "polyv/login.md" → "polyv/login.md"
+ * - Relative paths without extension: "polyv/login" → "polyv/login.md"
+ */
 export function validateIncludeName(name: string): ValidateIncludeNameResult {
   if (!name || name.length === 0) {
     return {
@@ -44,22 +52,25 @@ export function validateIncludeName(name: string): ValidateIncludeNameResult {
     }
   }
 
-  if (name.includes('/') || name.includes('\\') || name.includes('..')) {
+  // Disallow path traversal
+  if (name.includes('..') || name.includes('\\')) {
     return {
       ok: false,
       error: {
         code: 'INCLUDE_INVALID_NAME',
-        message: `Invalid include name "${name}": path separators (/, \\) and ".." are not allowed`,
+        message: `Invalid include name "${name}": ".." and backslashes are not allowed`,
       },
     }
   }
 
-  if (!VALID_NAME_PATTERN.test(name)) {
+  // Allow forward slashes for relative paths (e.g., "polyv/login.md")
+  // But validate the overall pattern
+  if (!VALID_PATH_PATTERN.test(name)) {
     return {
       ok: false,
       error: {
         code: 'INCLUDE_INVALID_NAME',
-        message: `Invalid include name "${name}": only alphanumeric characters, underscores, and hyphens are allowed`,
+        message: `Invalid include name "${name}": only alphanumeric characters, underscores, hyphens, forward slashes, and .md extension are allowed`,
       },
     }
   }
@@ -67,12 +78,53 @@ export function validateIncludeName(name: string): ValidateIncludeNameResult {
   return { ok: true }
 }
 
-export function resolveIncludePath(name: string, includeRoot: string): string {
-  return join(includeRoot, 'steps', `${name}.md`)
+/**
+ * Normalizes an include name to a relative path with .md extension.
+ * Examples:
+ * - "login" → "login.md"
+ * - "login.md" → "login.md"
+ * - "polyv/login" → "polyv/login.md"
+ * - "polyv/login.md" → "polyv/login.md"
+ */
+function normalizeIncludeName(name: string): string {
+  if (name.endsWith('.md')) {
+    return name
+  }
+  return `${name}.md`
+}
+
+/**
+ * Resolves an include path with fallback logic:
+ * 1. Try ${projectRoot}/steps/<normalized>
+ * 2. Fallback to ${projectRoot}/specs/steps/<normalized>
+ * 
+ * Returns the first existing path, or the primary path if readFile is not provided.
+ */
+export function resolveIncludePath(
+  name: string,
+  projectRoot: string,
+  readFile?: ReadFileFn
+): string {
+  const normalized = normalizeIncludeName(name)
+  const primaryPath = join(projectRoot, 'steps', normalized)
+  
+  if (!readFile) {
+    return primaryPath
+  }
+  
+  // Try primary path first
+  if (readFile(primaryPath) !== null) {
+    return primaryPath
+  }
+  
+  // Fallback to specs/steps/
+  const fallbackPath = join(projectRoot, 'specs', 'steps', normalized)
+  return fallbackPath
 }
 
 function getExpectedRelativeIncludePath(name: string): string {
-  return `steps/${name}.md`
+  const normalized = normalizeIncludeName(name)
+  return `steps/${normalized} (or specs/steps/${normalized} as fallback)`
 }
 
 function extractNodeText(node: any): string {
@@ -178,7 +230,7 @@ export function expandIncludes(
       return { ok: false, error: validation.error }
     }
 
-    const includePath = resolveIncludePath(name, includeRoot)
+    const includePath = resolveIncludePath(name, includeRoot, readFile)
     const content = readFile(includePath)
 
     if (content === null) {

@@ -48,23 +48,36 @@ describe('validateIncludeName', () => {
     expect(validateIncludeName('CommonSetup')).toEqual({ ok: true })
     expect(validateIncludeName('a')).toEqual({ ok: true })
     expect(validateIncludeName('A1_b-c')).toEqual({ ok: true })
+    // Now also support relative paths
+    expect(validateIncludeName('polyv/login')).toEqual({ ok: true })
+    expect(validateIncludeName('polyv/login.md')).toEqual({ ok: true })
+    expect(validateIncludeName('auth/sso/login.md')).toEqual({ ok: true })
   })
 
   it('returns error for names with forbidden characters', () => {
-    const result1 = validateIncludeName('path/to/file')
+    // Backslashes are not allowed
+    const result1 = validateIncludeName('path\\to\\file')
     expect(result1.ok).toBe(false)
     if (!result1.ok) {
       expect(result1.error.code).toBe('INCLUDE_INVALID_NAME')
     }
 
-    const result2 = validateIncludeName('path\\to\\file')
+    // Path traversal (..) is not allowed
+    const result2 = validateIncludeName('../parent')
     expect(result2.ok).toBe(false)
 
-    const result3 = validateIncludeName('../parent')
+    const result3 = validateIncludeName('..\\parent')
     expect(result3.ok).toBe(false)
-
-    const result4 = validateIncludeName('..\\parent')
+    
+    const result4 = validateIncludeName('foo/../bar')
     expect(result4.ok).toBe(false)
+    
+    // Invalid characters
+    const result5 = validateIncludeName('my steps')
+    expect(result5.ok).toBe(false)
+    
+    const result6 = validateIncludeName('step@123')
+    expect(result6.ok).toBe(false)
   })
 
   it('returns error for empty name', () => {
@@ -75,21 +88,48 @@ describe('validateIncludeName', () => {
     }
   })
 
-  it('returns error for names with spaces', () => {
-    const result = validateIncludeName('my steps')
-    expect(result.ok).toBe(false)
+  it('normalizes include names with .md extension', () => {
+    // Simple names get .md appended
+    expect(resolveIncludePath('login', '/project')).toBe('/project/steps/login.md')
+    // Already has .md, no change
+    expect(resolveIncludePath('login.md', '/project')).toBe('/project/steps/login.md')
+    // Relative paths work
+    expect(resolveIncludePath('polyv/login', '/project')).toBe('/project/steps/polyv/login.md')
+    expect(resolveIncludePath('polyv/login.md', '/project')).toBe('/project/steps/polyv/login.md')
   })
 })
 
 describe('resolveIncludePath', () => {
-  it('resolves path for directory input', () => {
-    const result = resolveIncludePath('login', '/project/specs')
-    expect(result).toBe('/project/specs/steps/login.md')
+  it('resolves path to primary steps/ directory', () => {
+    const result = resolveIncludePath('login', '/project')
+    expect(result).toBe('/project/steps/login.md')
   })
 
   it('resolves path with different names', () => {
-    expect(resolveIncludePath('common-setup', '/specs')).toBe('/specs/steps/common-setup.md')
-    expect(resolveIncludePath('step_1', '/my/path')).toBe('/my/path/steps/step_1.md')
+    expect(resolveIncludePath('common-setup', '/project')).toBe('/project/steps/common-setup.md')
+    expect(resolveIncludePath('step_1', '/project')).toBe('/project/steps/step_1.md')
+  })
+  
+  it('uses fallback path when primary does not exist', () => {
+    const mockReadFile = (path: string) => {
+      if (path === '/project/steps/login.md') return null
+      if (path === '/project/specs/steps/login.md') return '# Login steps'
+      return null
+    }
+    
+    const result = resolveIncludePath('login', '/project', mockReadFile)
+    expect(result).toBe('/project/specs/steps/login.md')
+  })
+  
+  it('prefers primary path when both exist', () => {
+    const mockReadFile = (path: string) => {
+      if (path === '/project/steps/login.md') return '# Primary login'
+      if (path === '/project/specs/steps/login.md') return '# Fallback login'
+      return null
+    }
+    
+    const result = resolveIncludePath('login', '/project', mockReadFile)
+    expect(result).toBe('/project/steps/login.md')
   })
 })
 

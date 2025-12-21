@@ -184,7 +184,8 @@ export function registerRunCommand(program: Command) {
 
       const parsedSpecs: ParsedSpec[] = []
 
-      const includeRoot = getIncludeRoot(inputPath, result.inputIsDirectory)
+      // Use cwd as includeRoot to resolve includes from project root (steps/ or specs/steps/)
+      const includeRoot = process.cwd()
 
       for (const specPath of result.specs) {
         let markdown: string

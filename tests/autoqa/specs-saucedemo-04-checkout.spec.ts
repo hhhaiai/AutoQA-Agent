@@ -1,14 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test'
+import { loadEnvFiles, getEnvVar } from '../../src/test-utils/autoqa-env'
 
-const baseUrl = 'https://www.saucedemo.com';
+loadEnvFiles()
+
+const baseUrl = getEnvVar('AUTOQA_BASE_URL')
+const password = getEnvVar('AUTOQA_PASSWORD')
+const username = getEnvVar('AUTOQA_USERNAME')
 
 test('saucedemo 04 checkout', async ({ page }) => {
   // Step 1: Navigate to /
   await page.goto(new URL('/', baseUrl).toString());
-  // Step 2: Fill the "Username" field with standard_user
-  await page.getByPlaceholder('Username').fill('standard_user');
-  // Step 3: Fill the "Password" field with secret_sauce
-  await page.getByPlaceholder('Password').fill('secret_sauce');
+  // Step 2: Fill the "Username" field with AUTOQA_USERNAME
+  await page.getByPlaceholder('Username').fill(username);
+  // Step 3: Fill the "Password" field with AUTOQA_PASSWORD
+  await page.getByPlaceholder('Password').fill(password);
   // Step 4: Click the "Login" button
   await page.locator('#login-button').click();
   // Step 5: Verify the user is logged in and sees the inventory/products page (e.g. header shows "Products")
@@ -24,6 +29,8 @@ test('saucedemo 04 checkout', async ({ page }) => {
   // Step 9: Verify the cart page shows "Your Cart" and contains at least 1 item
   const locator9_1 = page.getByText('Your Cart');
   await expect(locator9_1.nth(0)).toBeVisible();
+  const locator9_2 = page.getByText('Sauce Labs Backpack');
+  await expect(locator9_2.nth(0)).toBeVisible();
   // Step 10: Click the "Checkout" button
   await page.locator('#checkout').click();
   // Step 11: Verify the checkout information page is shown (e.g. title contains "Checkout: Your Information")
@@ -41,10 +48,12 @@ test('saucedemo 04 checkout', async ({ page }) => {
   const locator16_1 = page.getByText('Checkout: Overview');
   await expect(locator16_1.nth(0)).toBeVisible();
   // Step 17: Verify the overview shows:
-  const locator17_1 = page.getByText('Sauce Labs Backpack');
+  const locator17_1 = page.getByText('Payment Information');
   await expect(locator17_1.nth(0)).toBeVisible();
-  const locator17_2 = page.getByText('$29.99');
+  const locator17_2 = page.getByText('Shipping Information');
   await expect(locator17_2.nth(0)).toBeVisible();
+  const locator17_3 = page.getByText('Price Total');
+  await expect(locator17_3.nth(0)).toBeVisible();
   // Step 18: Click the "Finish" button
   await page.locator('#finish').click();
   // Step 19: Verify the checkout complete page is shown (e.g. title contains "Checkout: Complete!")
@@ -58,4 +67,4 @@ test('saucedemo 04 checkout', async ({ page }) => {
   // Step 22: Verify the user returns to the inventory/products page
   const locator22_1 = page.getByText('Products');
   await expect(locator22_1.nth(0)).toBeVisible();
-});
+})

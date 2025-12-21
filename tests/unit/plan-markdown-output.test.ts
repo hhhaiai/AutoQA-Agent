@@ -48,10 +48,16 @@ describe('Planner Markdown Output', () => {
       if (result.ok) {
         expect(result.value.preconditions).toHaveLength(2)
         expect(result.value.preconditions[0]).toContain('{{BASE_URL}}')
-        expect(result.value.steps).toHaveLength(5)
+        // Now includes login include step + 5 original steps = 6 total
+        expect(result.value.steps).toHaveLength(6)
         
+        // First step should be the auto-inserted login include
         const firstStepText = result.value.steps[0].text
-        expect(firstStepText).toContain('Navigate to {{BASE_URL}}/login')
+        expect(firstStepText).toContain('include: login')
+        
+        // Second step should be the first original step
+        const secondStepText = result.value.steps[1].text
+        expect(secondStepText).toContain('Navigate to {{BASE_URL}}/login')
         
         expect(markdown).toContain('Expected: Login page loads')
       }
@@ -205,7 +211,9 @@ describe('Planner Markdown Output', () => {
         }
       }
 
-      expect(stepCount).toBe(3)
+      // Now includes login include step + 3 original steps = 4 total
+      expect(stepCount).toBe(4)
+      // Include step has no Expected line, so still 3
       expect(expectedCount).toBe(3)
     })
 

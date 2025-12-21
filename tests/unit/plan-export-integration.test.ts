@@ -157,9 +157,12 @@ describe('Plan Export Integration (Epic 4)', () => {
       if (!parseResult.ok) return
 
       // Verify variables are in step text
-      expect(parseResult.value.steps[0].text).toContain('{{BASE_URL}}')
-      expect(parseResult.value.steps[1].text).toContain('{{USERNAME}}')
-      expect(parseResult.value.steps[2].text).toContain('{{PASSWORD}}')
+      // First step is the auto-inserted login include
+      expect(parseResult.value.steps[0].text).toContain('include: login')
+      // Then the original steps follow
+      expect(parseResult.value.steps[1].text).toContain('{{BASE_URL}}')
+      expect(parseResult.value.steps[2].text).toContain('{{USERNAME}}')
+      expect(parseResult.value.steps[3].text).toContain('{{PASSWORD}}')
     })
 
     it('should generate specs that work with IR locator validation', () => {

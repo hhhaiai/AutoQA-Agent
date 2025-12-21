@@ -58,8 +58,11 @@ so that 我可以直接用 `autoqa run` 执行这些用例而无需手工重写�
 
 ## Dev Notes
 
-- 本故事聚焦 **Planner 输出的 Markdown 用例可执行性**，不改变 `autoqa run` 的执行模型与 CLI 约定。  
-  - **来源:** [Source: docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md#1-背景与目标]
+- 本故事聚焦 **Planner 输出的 Markdown 用例可执行性**，在不改变 `autoqa run` 顶层 CLI 行为的前提下，对 include 步骤库与登录用例做了轻量扩展：  
+  - 引入 `plan.loginStepsSpec` 配置，用于约定「需要登录」用例应当 `include` 的登录步骤库路径；  
+  - 约定项目根目录下的 `steps/` 作为步骤库根目录，并兼容既有 `specs/steps/` 路径；  
+  - `autoqa run` 在展开 `include: ...` 时，优先从 `steps/` 解析，找不到时再回退到 `specs/steps/`。  
+  - **来源:** [Source: docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md#63-步骤库-include-的自动复用]
 - URL 与模板变量写法必须与 Epic 5/6 中的环境与登录态方案对齐，避免 Planner 生成的用例与手写用例在行为上出现不一致。  
   - **来源:** [Source: docs/epics.md#Epic-5-环境与测试数据配置（多环境-登录凭据等敏感配置）]  
   - **来源:** [Source: docs/epics.md#Epic-6-导出用例的登录态复用与执行加速-Playwright-Test-Suite-Optimization]

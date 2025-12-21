@@ -208,7 +208,37 @@ export type WriteTestPlanOutput = {
   errors: string[]
 }
 
-export function buildMarkdownForTestCase(testCase: TestCasePlan): string {
+export type BuildMarkdownOptions = {
+  loginStepsSpec?: string
+}
+
+/**
+ * Determines if a test case requires login based on preconditions and steps.
+ * Heuristics:
+ * - Preconditions mention "login", "logged in", "authenticated", "account"
+ * - Steps reference {{USERNAME}}, {{PASSWORD}}, or {{LOGIN_BASE_URL}}
+ * - Test type is 'form' and relates to authentication flows
+ */
+function requiresLogin(testCase: TestCasePlan): boolean {
+  const preconditionsText = (testCase.preconditions ?? []).join(' ').toLowerCase()
+  const stepsText = (testCase.steps ?? []).map(s => s.description).join(' ')
+  
+  // Check preconditions for login-related keywords
+  const loginKeywords = ['login', 'logged in', 'authenticated', 'account', 'credentials']
+  const hasPreconditionMatch = loginKeywords.some(keyword => preconditionsText.includes(keyword))
+  
+  // Check steps for credential template variables or login URL
+  const hasCredentialVars = stepsText.includes('{{USERNAME}}') || 
+                            stepsText.includes('{{PASSWORD}}') ||
+                            stepsText.includes('{{LOGIN_BASE_URL}}')
+  
+  return hasPreconditionMatch || hasCredentialVars
+}
+
+export function buildMarkdownForTestCase(
+  testCase: TestCasePlan,
+  options?: BuildMarkdownOptions
+): string {
   const lines: string[] = []
 
   lines.push(`# ${testCase.name} (Auto-generated)`)
@@ -230,17 +260,29 @@ export function buildMarkdownForTestCase(testCase: TestCasePlan): string {
     ? testCase.steps
     : []
 
+  // Determine if we need to prepend login include
+  const needsLogin = requiresLogin(testCase)
+  const loginStepsSpec = options?.loginStepsSpec ?? 'login'
+  
+  let stepNumber = 1
+  
+  // If test requires login, prepend include directive
+  if (needsLogin) {
+    lines.push(`${stepNumber}. include: ${loginStepsSpec}`)
+    stepNumber++
+  }
+
   if (steps.length === 0) {
-    lines.push('1. Navigate to {{BASE_URL}}/')
+    lines.push(`${stepNumber}. Navigate to {{BASE_URL}}/`)
     lines.push('   - Expected: The application home page loads successfully.')
   } else {
-    steps.forEach((step, index) => {
-      const n = index + 1
-      lines.push(`${n}. ${step.description}`)
+    steps.forEach((step) => {
+      lines.push(`${stepNumber}. ${step.description}`)
       const expected = step.expectedResult.trim()
       if (expected.length > 0) {
         lines.push(`   - Expected: ${expected}`)
       }
+      stepNumber++
     })
   }
 
@@ -280,6 +322,9 @@ export async function writeTestPlan(
     errors.push(`Failed to write test-plan.json: ${msg}`)
   }
 
+  // Extract loginStepsSpec from plan config snapshot
+  const loginStepsSpec = plan.configSnapshot.loginStepsSpec
+  
   for (const testCase of plan.cases) {
     const rawRel = (testCase.markdownPath ?? '').trim()
     const safeRel = rawRel.length > 0
@@ -310,7 +355,7 @@ export async function writeTestPlan(
     }
 
     try {
-      const markdown = buildMarkdownForTestCase(testCase)
+      const markdown = buildMarkdownForTestCase(testCase, { loginStepsSpec })
       await writeFile(specAbsPath, markdown, { encoding: 'utf-8', mode: 0o600 })
       const relPath = `.autoqa/runs/${runId}/plan/specs/${safeRel}`
       specPaths.push(relPath)

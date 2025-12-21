@@ -264,18 +264,78 @@ Status: draft
       - 一条正常流程用例；
       - 一条或多条边界/异常用例（例如空输入、超长输入、非法字符、不存在的搜索关键字）。
 
-### 6.3 步骤库 `include:` 的自动复用（可选）
+### 6.3 步骤库 `include:` 的自动复用
 
-中长期增强方向：
+本节约定 **登录步骤库** 与 `include:` 行为的统一设计，作为 Planner 与 Runner 的共同契约。
 
-- 探索 `specs/steps/*.md`，构建可用步骤库清单：
-  - 例如：`login`、`reset-app-state` 等。
-- 在 Planner prompt 中明确告诉 Agent：
-  - “存在步骤库 `include: login`，用于执行登录流程。”
-- 要求 Planner：
-  - 如需登录，尽量使用单步 `include: login` 代替展开重复步骤。
+#### 6.3.1 配置：登录步骤库路径 `plan.loginStepsSpec`
 
-该增强不影响现有执行能力，仅提升生成用例的可维护性与与手写库的一致性。
+- 在 `autoqa.config.json` 中的 `plan` 节点下新增字段：
+  - `plan.loginStepsSpec: string`
+  - 语义：Planner 在生成「需要登录」的用例时，应当 `include` 的 **登录步骤 Markdown** 路径。
+  - 路径为相对路径，相对于 **步骤库根目录**（见 6.3.2）。
+  - 示例：
+    - `"loginStepsSpec": "login.md"` → 生成 `include: login`（解析为 `steps/login.md`）。
+    - `"loginStepsSpec": "polyv/login.md"` → 生成 `include: polyv/login.md`（解析为 `steps/polyv/login.md`）。
+- 默认行为：
+  - 若未显式配置 `plan.loginStepsSpec`，则视为 `"loginStepsSpec": "login.md"`。
+  - Planner 输出中应统一采用 `include: login` 形式，Runner 侧将其解析为 `steps/login.md`。
+
+#### 6.3.2 步骤库根目录 `steps/`
+
+- 约定项目根目录下存在步骤库根目录：
+  - `${projectRoot}/steps/`
+  - 用于存放可复用步骤，例如：
+    - `steps/login.md`
+    - `steps/polyv/login.md`
+    - `steps/reset-app-state.md`
+- 为兼容既有手工用例，可以保留 `specs/steps/` 作为 Runner 的**回退查找路径**：
+  - 优先在 `${projectRoot}/steps/` 下查找；
+  - 若不存在，再尝试 `${projectRoot}/specs/steps/`。
+
+#### 6.3.3 Runner 侧 `include:` 解析规则
+
+当 Runner 在 Markdown Steps 中遇到形如：
+
+```markdown
+1. include: login
+```
+
+时，采用如下解析流程：
+
+- 读取原始值 `raw = "login"`：
+  - 若 `raw` 不含 `/` 且不以 `.md` 结尾：
+    - 归一化为 `<raw>.md`，即 `login.md`。
+  - 若 `raw` 包含路径分隔符（例如 `polyv/login.md`）：
+    - 原样作为相对路径使用。
+- 在步骤库根目录下拼接：
+  - 首先尝试 `${projectRoot}/steps/<normalized>`；
+  - 不存在时，再尝试 `${projectRoot}/specs/steps/<normalized>`。
+
+这样可以同时支持：
+
+- `include: login` → `steps/login.md`；
+- `include: polyv/login.md` → `steps/polyv/login.md`。
+
+#### 6.3.4 Planner 对登录用例的约束
+
+- Planner 负责判断哪些用例「需要登录」：
+  - 例如在 `TestCasePlan` 中引入一个布尔字段 `requiresLogin`（具体字段名可在实现 story 中敲定）；
+  - 或在 prompt 中对「登录态相关用例」给出清晰的判定标准。
+- 对所有「需要登录」的用例，Planner/Markdown 生成器必须满足：
+  - 在 Steps 的开头插入一条 `include: <plan.loginStepsSpec>`：
+    - 例如 `include: login` 或 `include: polyv/login.md`；
+  - 后续步骤在此基础上继续编号（即登录步骤之后再执行业务步骤）。
+- Preconditions 中关于「用户已登录」的描述，仅用于**说明起始世界状态**，不视为可执行动作；
+  实际达成登录态的责任在于：
+  - `include:` 登录步骤库；
+  - 或后续 Epic 中引入的 Flow runner / 全局登录钩子（参见 Epic 6）。
+
+该设计在保持现有 `include:` 语义的前提下：
+
+- 为 Planner 提供了明确的「登录步骤库」引用规范；
+- 为 Runner 提供了稳定的 include 解析规则；
+- 保证「需要登录」的自动生成用例在单独使用 `autoqa run` 执行时也具备可执行性，与手写示例（如 `specs/saucedemo-02-sorting.md` + `specs/steps/login.md`）风格一致。
 
 ---
 
