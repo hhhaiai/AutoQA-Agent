@@ -84,7 +84,7 @@ npm run release:beta
 
 ## 查看发布状态
 
-- GitHub Actions: https://github.com/nickcmay/autoqa-agent/actions
+- GitHub Actions: https://github.com/terryso/autoqa-agent/actions
 - NPM 包页面: https://www.npmjs.com/package/autoqa-agent
 
 ## 注意事项

@@ -15,12 +15,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/nickcmay/autoqa-agent.git"
+    "url": "https://github.com/terryso/autoqa-agent.git"
   },
   "bugs": {
-    "url": "https://github.com/nickcmay/autoqa-agent/issues"
+    "url": "https://github.com/terryso/autoqa-agent/issues"
   },
-  "homepage": "https://github.com/nickcmay/autoqa-agent#readme",
+  "homepage": "https://github.com/terryso/autoqa-agent#readme",
   "bin": {
     "autoqa": "dist/cli.js"
   },
