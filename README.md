@@ -13,16 +13,20 @@
 
 A "Docs-as-Tests" automated acceptance testing CLI tool based on Claude Agent SDK + Playwright.
 
-> **Current Status**: Core capabilities of Epic 1-4 have been implemented: `autoqa init` initialization, `autoqa run` execution loop, assertions + self-healing guardrails, and action IR recording with automatic export to `@playwright/test` cases.
+> **Current Status**: Core capabilities of Epic 1-7 have been implemented: `autoqa init` initialization, `autoqa run` execution loop, assertions + self-healing guardrails, action IR recording with automatic export to `@playwright/test` cases, intelligent web application exploration (`autoqa plan-explore`), automated test plan generation (`autoqa plan-generate`), and comprehensive configuration support with enhanced CLI.
 
 ## 📖 Table of Contents
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
 - [How It Works](#how-it-works)
+  - [Architecture Overview](#architecture-overview)
+  - [Plan Command Structure](#plan-command-structure)
+- [AutoQA Agent vs Playwright Codegen](#-autoqa-agent-vs-playwright-codegen)
 - [Implemented Features](#implemented-features)
 - [Usage Guide](#usage-guide)
 - [Configuration](#configuration)
+- [Usage Examples](#usage-examples)
 - [Artifacts](#artifacts)
 - [Development Guide](#development-guide)
 - [Roadmap](#roadmap)
@@ -124,11 +128,152 @@ flowchart TD
 3. **Intelligent Locating**: Prioritize stable ref references, fallback to semantic descriptions on failure
 4. **Assertions & Self-Healing**: Execute assertion tools for Verify/Assert steps; flow back error context for retry on failure, limited by guardrails
 5. **Result Collection**: Automatically record screenshots, snapshots, traces, and structured logs
-6. **沉淀与导出**: Record action IR, and automatically export `@playwright/test` cases to `tests/autoqa/` after spec success
+6. **Persistence & Export**: Record action IR, and automatically export `@playwright/test` cases to `tests/autoqa/` after spec success
+
+### Architecture Overview
+
+```mermaid
+flowchart TD
+    %% Main CLI Layer
+    CLI["autoqa CLI"] --> Plan["Plan Commands"]
+    CLI --> Run["Run Command"]
+    CLI --> Init["Init Command"]
+    
+    %% Plan Command Architecture
+    Plan --> Explore["explore"]
+    Plan --> Generate["generate"]
+    Plan --> Full["explore + generate"]
+    
+    %% Exploration Flow
+    Explore --> Config["Configuration Loading"]
+    Config --> Browser["Browser Creation"]
+    Browser --> ExploreAgent["Explore Agent"]
+    ExploreAgent --> ExploreTools["Planning Tools"]
+    ExploreTools --> ExploreOutput["Exploration Artifacts"]
+    
+    %% Generation Flow
+    Generate --> ExploreOutput
+    Generate --> PlanAgent["Plan Agent"]
+    PlanAgent --> TestPlan["Test Plan Generation"]
+    TestPlan --> SpecOutput["Markdown Specs"]
+    
+    %% Configuration Layer
+    Config --> ConfigFile["autoqa.config.json"]
+    Config --> CliOptions["CLI Options"]
+    Config --> Defaults["Default Values"]
+    
+    %% Browser & Tools Layer
+    Browser --> Playwright["Playwright Engine"]
+    ExploreTools --> BrowserTools["Browser Tools"]
+    ExploreTools --> PlannerTools["Planner Tools"]
+    
+    %% Output Layer
+    ExploreOutput --> ExploreGraph["Navigation Graph"]
+    ExploreOutput --> Elements["Element Inventory"]
+    ExploreOutput --> Transcript["Exploration Transcript"]
+    
+    SpecOutput --> MarkdownFiles["*.md Test Files"]
+    SpecOutput --> TestPlanJson["test-plan.json"]
+    
+    %% Styling
+    style CLI fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
+    style Plan fill:#f3e5f5,stroke:#9c27b0,color:#4a148c
+    style Run fill:#e8f5e9,stroke:#4caf50,color:#1b5e20
+    style Init fill:#fff3e0,stroke:#ff9800,color:#e65100
+    style Explore fill:#e8eaf6,stroke:#3f51b5,color:#1a237e
+    style Generate fill:#f1f8e9,stroke:#7cb342,color:#33691e
+    style Config fill:#fce4ec,stroke:#e91e63,color:#880e4f
+    style Browser fill:#e0f7fa,stroke:#00acc1,color:#004d40
+    style ExploreAgent fill:#fff8e1,stroke:#ffc107,color:#f57c00
+    style PlanAgent fill:#f9fbe7,stroke:#cddc39,color:#827717
+    style ExploreOutput fill:#f3e5f5,stroke:#9c27b0,color:#4a148c
+    style SpecOutput fill:#e8f5e9,stroke:#4caf50,color:#1b5e20
+```
+
+### Plan Command Structure
+
+```mermaid
+flowchart LR
+    subgraph "Plan Commands"
+        Direction["Input Selection"]
+        
+        subgraph "Exploration Phase"
+            StartURL["Start URL"]
+            ExploreDepth["Depth: 1-10"]
+            PageLimit["Max Pages"]
+            Navigation["Navigation Graph"]
+            ElementDiscovery["Element Discovery"]
+        end
+        
+        subgraph "Generation Phase"
+            TestTypes["Test Types"]
+            PlanGeneration["Test Plan"]
+            MarkdownSpecs["Markdown Specs"]
+        end
+        
+        subgraph "Output Artifacts"
+            GraphFile["navigation-graph.json"]
+            ElementsFile["elements.json"]
+            TranscriptFile["transcript.jsonl"]
+            TestPlanFile["test-plan.json"]
+            SpecFiles["specs/*.md"]
+        end
+    end
+    
+    Direction --> ExplorePhase
+    Direction --> GeneratePhase
+    
+    ExplorePhase --> OutputArtifacts
+    GeneratePhase --> OutputArtifacts
+    
+    style Direction fill:#e3f2fd,stroke:#2196f3,color:#0d47a1
+    style ExplorePhase fill:#f3e5f5,stroke:#9c27b0,color:#4a148c
+    style GeneratePhase fill:#e8f5e9,stroke:#4caf50,color:#1b5e20
+    style OutputArtifacts fill:#fff3e0,stroke:#ff9800,color:#e65100
+```
+
+## AutoQA Agent vs Playwright Codegen
+
+AutoQA Agent represents the next evolution in automated testing, going beyond traditional code generation tools like Playwright's codegen:
+
+| Feature | Playwright Codegen | AutoQA Agent | Assessment |
+|---------|------------------|-------------|-----------|
+| **Selector Priority** | 5-layer priority strategy | 7-layer priority strategy | 🏆 AutoQA more comprehensive |
+| **AI Integration** | Basic AI assistance | Claude Agent SDK | 🏆 AutoQA more advanced |
+| **Event Capture** | Browser injection listening | Agent active exploration | 🏆 AutoQA more intelligent |
+| **Test Planning** | No planning features | AI-driven planning | 🏆 AutoQA unique feature |
+| **Self-Healing** | Limited smart retry | Complete guardrail system | 🏆 AutoQA more robust |
+
+### Key Advantages
+
+- **Intelligent Test Planning**: Unlike Playwright's record-playback approach, AutoQA Agent actively explores and plans comprehensive test suites
+- **Superior Selector Strategy**: 7-layer priority system with accessibility-first approach vs Playwright's 5-layer system
+- **Complete AI Integration**: Built on Claude Agent SDK for true autonomous reasoning vs Playwright's basic AI assistance
+- **Advanced Self-Healing**: Comprehensive guardrail system and intelligent retry mechanisms
+- **Structured Exploration**: Automatic discovery of application structure and relationships
 
 ## Implemented Features
 
 ### CLI Commands
+
+#### Test Planning & Exploration Commands
+
+- **`autoqa plan`** - Full exploration and test case generation (default command)
+  - Automatically explores the target web application
+  - Generates comprehensive test plan and Markdown specifications
+  - Supports both exploration and generation in a single run
+  
+- **`autoqa plan-explore`** - Web application exploration only
+  - Explores target application and captures page structure
+  - Generates navigation graph and element inventory
+  - Creates exploration artifacts for later test generation
+  
+- **`autoqa plan-generate`** - Generate test cases from existing exploration
+  - Uses previously generated exploration artifacts
+  - Creates Markdown test specifications
+  - Supports configurable test type generation
+
+#### Test Execution Commands
 
 - **`autoqa init`** - Initialize project configuration
 - **`autoqa run <path> --url <baseUrl>`** - Execute test cases (`--url` is required)
@@ -181,7 +326,6 @@ Note: In the current version, Base URL is provided by `autoqa run --url <baseUrl
 Steps starting with the following will be recognized as assertions:
 
 - `Verify` / `Assert`
-- `验证` / `断言`
 
 ### Best Practices
 
@@ -192,7 +336,16 @@ Steps starting with the following will be recognized as assertions:
 
 ## Configuration
 
-`autoqa.config.json` configuration file:
+### Configuration File Support
+
+AutoQA Agent supports comprehensive configuration through `autoqa.config.json`. This file allows you to:
+
+- Define default target URLs and authentication
+- Configure exploration limits and guardrails
+- Specify test types and inclusion/exclusion patterns
+- Set browser and execution preferences
+
+### Complete Configuration Schema
 
 ```json
 {
@@ -201,23 +354,231 @@ Steps starting with the following will be recognized as assertions:
     "maxToolCallsPerSpec": 200,
     "maxConsecutiveErrors": 8,
     "maxRetriesPerStep": 5
+  },
+  "exportDir": "tests/autoqa",
+  "plan": {
+    "baseUrl": "https://example.com",
+    "maxDepth": 3,
+    "maxPages": 50,
+    "includePatterns": ["/dashboard", "/settings"],
+    "excludePatterns": ["/admin", "/billing"],
+    "testTypes": ["functional", "form", "navigation", "responsive", "boundary", "security"],
+    "auth": {
+      "loginUrl": "https://example.com/login",
+      "username": "testuser@example.com",
+      "password": "password123"
+    },
+    "guardrails": {
+      "maxAgentTurnsPerRun": 1000,
+      "maxSnapshotsPerRun": 500,
+      "maxPagesPerRun": 100,
+      "maxTokenPerRun": 5000000
+    }
   }
 }
 ```
 
-Note:
+### Configuration Options
 
-- `autoqa init` will generate this file in the current directory.
-- `autoqa run` also supports running without a generated configuration file (will use built-in defaults), but still requires Base URL to be provided via `--url`.
+#### Global Settings
+- **`schemaVersion`**: Configuration file version (required)
+- **`guardrails`**: Global execution guardrails for `run` command
+- **`exportDir`**: Directory for exported test cases (default: "tests/autoqa")
 
-### Environment Variables
+#### Plan Configuration (`plan`)
+- **`baseUrl`**: Default target URL for exploration
+- **`maxDepth`**: Maximum exploration depth (1-10, default: 3)
+- **`maxPages`**: Maximum pages to visit (default: 50)
+- **`includePatterns`**: URL patterns to include in exploration
+- **`excludePatterns`**: URL patterns to exclude from exploration
+- **`testTypes`**: Test types to generate:
+  - `functional`: Core functionality tests
+  - `form`: Form submission and validation tests
+  - `navigation`: Navigation and routing tests
+  - `responsive`: Responsive design tests
+  - `boundary`: Edge case and error boundary tests
+  - `security`: Basic security tests
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `ANTHROPIC_API_KEY` | Claude API key | - |
-| `AUTOQA_ARTIFACTS` | Artifact retention strategy: `all` / `fail` / `none` | `fail` |
-| `AUTOQA_TOOL_CONTEXT` | Context injected to Agent during tool calls: `screenshot` / `snapshot` / `none` | `screenshot` |
-| `AUTOQA_PREFLIGHT_NAVIGATE` | Whether to pre-warm with `page.goto(baseUrl)` before run: `1` to enable | - |
+#### Authentication (`plan.auth`)
+- **`loginUrl`**: Login page URL (if different from target)
+- **`username`**: Login username (or use `usernameVar` for environment variable)
+- **`password`**: Login password (or use `passwordVar` for environment variable)
+- **`usernameVar`**: Environment variable name for username
+- **`passwordVar`**: Environment variable name for password
+
+#### Plan Guardrails (`plan.guardrails`)
+- **`maxAgentTurnsPerRun`**: Maximum agent tool calls per exploration (default: 1000)
+- **`maxSnapshotsPerRun`**: Maximum snapshots captured (default: 500)
+- **`maxPagesPerRun`**: Maximum pages explored (default: 100)
+- **`maxTokenPerRun`**: Maximum tokens consumed (default: 5,000,000)
+
+### CLI Override Priority
+
+CLI parameters take precedence over configuration file settings:
+
+```bash
+# Configuration file values are overridden by CLI options
+autoqa plan --url https://override.com --depth 5 --max-pages 20
+```
+
+Configuration loading priority:
+1. CLI options (highest)
+2. `autoqa.config.json` file
+3. Built-in defaults (lowest)
+
+## Usage Examples
+
+### Example 1: Basic Web Application Exploration
+
+```bash
+# Quick exploration of a public website
+autoqa plan-explore --url https://example.com --depth 2 --max-pages 10
+
+# Output:
+# Exploration completed for runId: abc123...
+# Pages visited: 8
+# Max depth reached: 2
+# Results written to: .autoqa/runs/abc123.../plan-explore/
+```
+
+### Example 2: Full Test Planning with Authentication
+
+```bash
+# Create autoqa.config.json with authentication
+cat > autoqa.config.json << 'EOF'
+{
+  "schemaVersion": 1,
+  "plan": {
+    "baseUrl": "https://app.example.com",
+    "maxDepth": 3,
+    "auth": {
+      "loginUrl": "https://app.example.com/login",
+      "username": "test@example.com",
+      "password": "password123"
+    },
+    "testTypes": ["functional", "form", "navigation"],
+    "guardrails": {
+      "maxAgentTurnsPerRun": 50,
+      "maxPagesPerRun": 20
+    }
+  }
+}
+EOF
+
+# Run full exploration and test generation
+autoqa plan
+
+# Output:
+# Starting exploration...
+# Exploration completed
+# Pages visited: 15
+# Exploration results: .autoqa/runs/abc123.../plan-explore/
+# 
+# Generating test cases...
+# Test plan generated
+# Test cases created: 12
+# Test specs: .autoqa/runs/abc123.../plan/specs/
+```
+
+### Example 3: Targeted Testing with Patterns
+
+```bash
+# Focus on specific application areas
+autoqa plan \
+  --url https://app.example.com \
+  --include-patterns "/dashboard,/settings,/profile" \
+  --exclude-patterns "/admin,/billing" \
+  --test-types "functional,form,navigation" \
+  --depth 4 \
+  --max-pages 30
+
+# Results in focused exploration of user-facing areas only
+```
+
+### Example 4: CI/CD Integration
+
+```bash
+# Headless exploration for automated pipelines
+autoqa plan \
+  --config ./ci/autoqa.config.json \
+  --headless \
+  --depth 2 \
+  --max-pages 15 \
+  --test-types "functional,navigation"
+
+# Exit codes:
+# 0: Success
+# 1: Runtime error  
+# 2: Configuration error
+# 10: Guardrail violation
+```
+
+### Example 5: Two-Phase Workflow
+
+```bash
+# Phase 1: Exploration only (can be done once per version)
+autoqa plan-explore \
+  --url https://app.example.com \
+  --depth 4 \
+  --max-pages 50 \
+  --login-url https://app.example.com/login \
+  --username ci@example.com \
+  --password $CI_PASSWORD
+
+# Phase 2: Generate different test types from same exploration
+autoqa plan-generate \
+  --run-id abc123... \
+  --test-types "functional,form"
+
+# Later: Generate additional test types without re-exploring
+autoqa plan-generate \
+  --run-id abc123... \
+  --test-types "security,boundary"
+```
+
+### Generated Test Structure
+
+After running plan commands, you'll get:
+
+```
+.autoqa/runs/<runId>/
+├── plan-explore/
+│   ├── navigation-graph.json     # Site navigation structure
+│   ├── elements.json            # Discovered interactive elements
+│   └── transcript.jsonl         # Exploration log
+├── plan/
+│   ├── test-plan.json          # Structured test plan
+│   └── specs/
+│       ├── dashboard-login.md   # Generated test cases
+│       ├── user-profile.md
+│       └── settings-form.md
+└── plan-summary.json           # Execution summary
+```
+
+### Example Generated Test Case
+
+The generated Markdown test cases follow this format:
+
+```markdown
+# Dashboard Login Test
+
+## Preconditions
+
+- User is logged into the application
+- Dashboard page is accessible
+
+## Steps
+
+1. Navigate to /dashboard
+2. Verify the user profile section is visible
+3. Click the settings navigation link
+4. Verify the settings page loads successfully
+5. Update the user name field with "Test User"
+6. Click the save button
+7. Verify the success notification appears
+8. Navigate back to dashboard
+9. Verify the updated name is displayed
+```
 
 ## Artifacts
 
@@ -277,9 +638,20 @@ npm run build
 - [x] Epic 2: Execution loop (from Markdown driving browser to complete flow)
 - [x] Epic 3: Acceptance judgment and self-healing loop (assertions + failure retry + guardrails)
 - [x] Epic 4: Sedimentation and export (action IR + automatic export Playwright Test)
+- [x] Epic 5: Configurable exploration strategy (intelligent web application discovery)
+- [x] Epic 6: Test plan generation (automated test case creation from exploration)
+- [x] Epic 7: Integration with existing toolchain (configuration files, CLI enhancement)
 
 ### Backlog (Optional Directions)
 
+- [ ] Enhanced test case generation with more sophisticated test types
+- [ ] Visual testing and UI regression detection
+- [ ] API testing integration alongside UI tests
+- [ ] Test execution scheduling and parallel execution
+- [ ] Advanced reporting and analytics dashboard
+- [ ] Integration with popular CI/CD platforms
+- [ ] Support for mobile and responsive testing patterns
+- [ ] Performance testing capabilities
 - [ ] Enrich export capabilities (more semantic step parsing and more complete assertion mapping)
 - [ ] Add more example specs and end-to-end demo projects
 - [ ] Continuous improvement of documentation and architecture diagrams

@@ -90,6 +90,6 @@ development_status:
   7-1-app-exploration-engine: done
   7-2-intelligent-test-case-generator: done
   7-3-plan-command-implementation: done
-  7-4-configurable-exploration-strategy: review
-  7-5-integration-with-existing-toolchain: backlog
+  7-4-configurable-exploration-strategy: done
+  7-5-integration-with-existing-toolchain: done
   epic-7-retrospective: optional

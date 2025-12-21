@@ -97,6 +97,7 @@ export type PlanCliOptions = {
   loginUrl?: string
   username?: string
   password?: string
+  skipUrlValidation?: boolean
 }
 
 export function loadPlanConfig(fileConfig: AutoqaConfig, cliOptions: PlanCliOptions): PlanConfig {
@@ -133,8 +134,8 @@ export function loadPlanConfig(fileConfig: AutoqaConfig, cliOptions: PlanCliOpti
     guardrails.maxTokenPerRun = DEFAULT_PLAN_GUARDRAILS.maxTokenPerRun
   }
   
-  const baseUrl = cliOptions.url || planConfig.baseUrl
-  if (!baseUrl) {
+  let baseUrl = cliOptions.url || planConfig.baseUrl
+  if (!baseUrl && !cliOptions.skipUrlValidation) {
     throw new Error('baseUrl is required (provide via --url or autoqa.config.json plan.baseUrl)')
   }
   

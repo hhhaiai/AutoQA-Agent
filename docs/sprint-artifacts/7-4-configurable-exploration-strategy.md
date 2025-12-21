@@ -1,6 +1,6 @@
 # Story 7.4: 配置化探索与生成策略
 
-Status: review
+Status: done
 
 ## Story
 
