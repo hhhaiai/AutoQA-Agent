@@ -762,3 +762,43 @@ So that 登录功能本身能被真实验证（而不是被缓存状态绕过）
 **Then** 测试必须在未登录状态开始，并显式执行登录步骤
 **And** 用例完成后应验证登录成功的可观察结果（例如跳转/页面元素/文案）
 
+## Epic 8: Planner 输出质量与 URL Scope 控制
+
+用户完成该 Epic 后，可以在保留 Epic 7 智能规划能力的基础上，进一步获得：
+- 聚焦指定起始 URL（页面/模块）的探索与用例规划能力；
+- 与手写示例一致、可直接由 `autoqa run` 执行的 Markdown 测试用例；
+- 更系统的用例质量标准（包含 Happy path、边界/负例、起始状态与成功标准），并在合适场景复用 `include:` 步骤库。
+
+**FRs covered:** FR15, FR16, FR17
+
+Tech Spec: `docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md`
+
+### Story 8.1: 规划生成的 Markdown 用例可直接执行
+
+As a QA 工程师,
+I want `autoqa plan` / `autoqa plan-explore` + `autoqa plan-generate` 生成的 Markdown 用例在结构和风格上与手写示例保持一致,
+So that 我可以直接用 `autoqa run` 执行这些用例而无需手工重写。
+
+**FRs covered:** FR16
+
+Tech Spec: `docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md`
+
+### Story 8.2: 探索与测试计划围绕指定 URL Scope 聚焦
+
+As a QA 工程师,
+I want 通过配置 URL Scope（包含/排除模式与探索范围模式）控制 Planner 只围绕我关心的页面或模块生成测试计划,
+So that 在大型控制台或多模块应用中，`autoqa plan` 不会把时间和成本浪费在与当前目标无关的区域。
+
+**FRs covered:** FR15, FR17
+
+Tech Spec: `docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md`
+
+### Story 8.3: Planner 提示词与用例质量标准增强
+
+As a QA 工程师,
+I want Planner 在生成测试计划时自动考虑 Happy path、边界/负例场景、起始状态与成功标准，并在适当场景复用 `include:` 步骤库,
+So that 产生的用例既具备自动化可执行性，又符合资深测试工程师的用例质量标准。
+
+**FRs covered:** FR15, FR16
+
+Tech Spec: `docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md`

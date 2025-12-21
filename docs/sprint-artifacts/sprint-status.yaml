@@ -1,4 +1,4 @@
-# generated: 2025-12-15T21:54:43+08:00
+# generated: 2025-12-21T16:17:00+08:00
 # project: AutoQA-Agent
 # project_key: autoqa-agent
 # tracking_system: file-system
@@ -17,24 +17,23 @@
 #
 # Story Status:
 #   - backlog: Story only exists in epic file
-#   - drafted: Story file created in stories folder
-#   - ready-for-dev: Draft approved and story context created
+#   - ready-for-dev: Story file created in stories folder
 #   - in-progress: Developer actively working on implementation
 #   - review: Ready for code review (via Dev's code-review workflow)
 #   - done: Story completed
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
-#   - completed: Retrospective has been done
+#   - done: Retrospective has been completed
 #
 # WORKFLOW NOTES:
 # ===============
 # - Epic transitions to 'in-progress' automatically when first story is created
 # - Stories can be worked in parallel if team capacity allows
-# - SM typically drafts next story after previous one is 'done' to incorporate learnings
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2025-12-20T22:18:00+08:00
+generated: 2025-12-21T16:17:00+08:00
 project: AutoQA-Agent
 project_key: autoqa-agent
 tracking_system: file-system
@@ -68,9 +67,10 @@ development_status:
   3-4-failure-artifacts-exit-codes-ci: done
   epic-3-retrospective: optional
 
-  epic-4: done
+  epic-4: in-progress
   4-1-runtime-locator-validation-ir: done
   4-2-auto-export-playwright-test: done
+  4-3-navigate-placeholder-semantic-urlvalue: backlog
   epic-4-retrospective: optional
 
   epic-5: in-progress
@@ -93,3 +93,9 @@ development_status:
   7-4-configurable-exploration-strategy: done
   7-5-integration-with-existing-toolchain: done
   epic-7-retrospective: optional
+
+  epic-8: in-progress
+  8-1-planner-generated-specs-executable: ready-for-dev
+  8-2-exploration-test-plan-url-scope: backlog
+  8-3-planner-prompt-quality-standards: backlog
+  epic-8-retrospective: optional
