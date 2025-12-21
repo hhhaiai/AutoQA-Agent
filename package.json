@@ -1,6 +1,6 @@
 {
   "name": "autoqa-agent",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Automated QA testing agent powered by Claude and Playwright",
   "license": "MIT",
   "type": "module",
