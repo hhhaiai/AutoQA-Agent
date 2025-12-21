@@ -12,6 +12,11 @@ on:
   release:
     types: [published]
 
+# 设置权限
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test:
     name: Test

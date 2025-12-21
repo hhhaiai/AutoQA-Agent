@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
 
+# 设置权限
+permissions:
+  contents: write
+  releases: write
+
 jobs:
   release:
     name: Create Release
@@ -50,12 +55,10 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             ## 更新内容
             ${{ steps.changelog.outputs.changelog }}
@@ -71,3 +74,5 @@ jobs:
             \`\`\`
           draft: false
           prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
