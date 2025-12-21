@@ -162,3 +162,25 @@
   - 必须满足 ToolResult 契约
   - 必须注册到统一入口（如 `src/tools/index.ts`）
   - 必须具备失败截图与可重试语义（`retriable`）
+
+## 10. 配置与安全
+
+- **配置文件**：`autoqa.config.json`（schema 在 `src/config/schema.ts`）
+- **新增配置项**：
+  - 必须在 `src/config/schema.ts` 中声明并提供默认值
+  - 必须更新本文件与 `docs/architecture.md` 的相关约束（如有影响）
+- **PlanConfig 字段**（当前已知）：
+  - `baseUrl`: 目标应用 URL
+  - `maxDepth`: 探索深度限制
+  - `maxPages`: 最大页面数
+  - `includePatterns`: URL 白名单模式（相对 URL 匹配）
+  - `excludePatterns`: URL 黑名单模式（相对 URL 匹配）
+  - `exploreScope`: 探索范围模式 (`'site'` | `'focused'` | `'single_page'`)，默认 `'site'`
+  - `testTypes`: 测试类型列表
+  - `guardrails`: 护栏配置
+  - `auth`: 认证配置
+  - `loginStepsSpec`: 登录步骤规格路径
+- **敏感信息**：
+  - 密码/token 必须通过 `--password` / 环境变量传入，不得硬编码
+  - 日志输出必须经过 `sanitizeErrorMessage` 脱敏（见 `src/logging/redact.ts`）
+  - 必须具备失败截图与可重试语义（`retriable`）

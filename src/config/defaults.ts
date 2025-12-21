@@ -15,11 +15,12 @@ export const DEFAULT_PLAN_GUARDRAILS: Required<PlanGuardrails> = {
   maxTokenPerRun: 5000000,
 }
 
-export const DEFAULT_PLAN_CONFIG: Required<Omit<PlanConfigFromFile, 'baseUrl' | 'auth'>> = {
+export const DEFAULT_PLAN_CONFIG: Required<Omit<PlanConfigFromFile, 'baseUrl' | 'auth' | 'loginStepsSpec'>> = {
   maxDepth: 3,
   maxPages: 50,
   includePatterns: [],
   excludePatterns: [],
+  exploreScope: 'site',
   testTypes: ['functional', 'form', 'navigation', 'responsive', 'boundary', 'security'],
   guardrails: DEFAULT_PLAN_GUARDRAILS,
 }

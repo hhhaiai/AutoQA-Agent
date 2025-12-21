@@ -64,12 +64,68 @@ Guardrails (stop exploration when any limit is reached):
 `
     : ''
 
+  // Build URL Scope section based on exploreScope mode
+  const exploreScope = config.exploreScope ?? 'site'
+  let urlScopeSection = ''
+
+  if (exploreScope === 'focused') {
+    const includePatterns = config.includePatterns ?? []
+    const excludePatterns = config.excludePatterns ?? []
+    
+    urlScopeSection = `
+## URL Scope Constraints (Focused Mode)
+
+You are operating in FOCUSED exploration mode. Only explore pages that match the URL scope:
+
+**In-Scope URL Definition:**
+- A URL is in-scope if its relative path (pathname + hash) matches at least one include pattern
+- AND does not match any exclude pattern
+- Relative path example: For "https://console.polyv.net/live/index.html#/channel", the relative path is "/live/index.html#/channel"
+
+**Include Patterns (whitelist):**
+${includePatterns.length > 0 ? includePatterns.map(p => `- ${p}`).join('\n') : '- (none specified - will auto-derive from base URL)'}
+
+**Exclude Patterns (blacklist):**
+${excludePatterns.length > 0 ? excludePatterns.map(p => `- ${p}`).join('\n') : '- (none)'}
+
+**Exploration Strategy:**
+- Prioritize exploring pages that match the include patterns
+- Avoid clicking on navigation links that clearly lead to excluded modules (e.g., statistics, settings, playback if not in scope)
+- If you navigate to an out-of-scope page by accident, note it but don't explore it deeply
+`
+  } else if (exploreScope === 'single_page') {
+    const includePatterns = config.includePatterns ?? []
+    
+    urlScopeSection = `
+## URL Scope Constraints (Single Page Mode)
+
+You are operating in SINGLE PAGE exploration mode. Focus on the current page's interactions:
+
+**Allowed URL Changes:**
+- Hash-based sub-routes within the same page (e.g., #/tab1, #/tab2)
+- URLs explicitly allowed in include patterns: ${includePatterns.length > 0 ? includePatterns.join(', ') : '(none)'}
+
+**Exploration Strategy:**
+- Focus on interactions within the current page: search, filtering, sorting, pagination, expand/collapse, modals
+- Avoid clicking global navigation links that lead to different modules
+- Document in-page state changes and dynamic content
+`
+  } else {
+    // 'site' mode - maintain current behavior
+    urlScopeSection = `
+## URL Scope (Site-wide Mode)
+
+Explore the entire site within the same domain, respecting the maximum depth limit.
+`
+  }
+
   return `You are an AutoQA Exploration Agent. Your task is to explore a web application and document its structure.
 
 Base URL: ${config.baseUrl}
 Maximum Depth: ${config.maxDepth ?? 3}
 ${authSection}
 ${guardrailSection}
+${urlScopeSection}
 
 ## Your Mission
 
@@ -92,6 +148,7 @@ Systematically explore the web application to discover:
 3. **Navigate**: Click on internal links to discover new pages (stay within the same domain)
 4. **Depth control**: Track how many clicks deep you are from the start page. Stop exploring paths deeper than ${config.maxDepth ?? 3} levels.
 5. **Avoid duplicates**: Don't revisit pages you've already explored
+6. **URL Scope**: ${exploreScope === 'site' ? 'Explore the entire site' : exploreScope === 'focused' ? 'Prioritize in-scope pages matching include patterns' : 'Focus on current page interactions with minimal navigation'}
 
 ## IMPORTANT: Final Output Required
 

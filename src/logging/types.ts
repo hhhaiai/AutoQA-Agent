@@ -170,6 +170,13 @@ export type PlanGenerateOrchestratorFinishedEvent = LogEventBase & {
   specCount: number
 }
 
+export type PlanGenerateUrlScopeFilteredEvent = LogEventBase & {
+  event: 'autoqa.plan.generate.url_scope_filtered'
+  originalPageCount: number
+  filteredPageCount: number
+  exploreScope: string
+}
+
 export type PlanGenerateFailedEvent = LogEventBase & {
   event: 'autoqa.plan.generate.failed'
   error: string
@@ -216,6 +223,7 @@ export type LogEvent =
   | PlanGenerateOrchestratorStartedEvent
   | PlanGenerateOrchestratorOutputErrorsEvent
   | PlanGenerateOrchestratorFinishedEvent
+  | PlanGenerateUrlScopeFilteredEvent
   | PlanStartedEvent
   | PlanFinishedEvent
   | PlanFailedEvent

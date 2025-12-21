@@ -7,6 +7,7 @@ import type { PlanConfig, ExplorationGraph, TestPlan, ExplorationResult } from '
 import { writeTestPlan, writeExplorationResult, writePlanSummary, type WriteTestPlanOutput } from './output.js'
 import { runPlanAgent, type PlanAgentOptions } from './plan-agent.js'
 import { explore } from './explore.js'
+import { filterGraphByScope } from './url-scope.js'
 
 export type GenerateTestPlanOptions = {
   runId: string
@@ -93,10 +94,23 @@ export async function generateTestPlan(options: GenerateTestPlanOptions): Promis
     pageCount: graph.pages.length,
   })
 
+  // Apply URL Scope filtering to the graph
+  const filteredGraph = filterGraphByScope(graph, config)
+  
+  if (filteredGraph.pages.length < graph.pages.length) {
+    logger.log({
+      event: 'autoqa.plan.generate.url_scope_filtered',
+      runId,
+      originalPageCount: graph.pages.length,
+      filteredPageCount: filteredGraph.pages.length,
+      exploreScope: config.exploreScope ?? 'site',
+    })
+  }
+
   const planAgentOptions: PlanAgentOptions = {
     runId,
     config,
-    graph,
+    graph: filteredGraph,
     cwd,
     logger,
     debug,

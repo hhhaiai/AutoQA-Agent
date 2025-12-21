@@ -34,6 +34,13 @@ export const planConfigSchema = z.object({
   maxPages: z.number().int().positive().optional(),
   includePatterns: z.array(z.string()).optional(),
   excludePatterns: z.array(z.string()).optional(),
+  /**
+   * Exploration scope mode controlling URL filtering behavior.
+   * - 'site': Default, only domain and maxDepth constraints
+   * - 'focused': Only URLs matching includePatterns (not excludePatterns) are in-scope
+   * - 'single_page': Explore current page interactions, limited URL changes
+   */
+  exploreScope: z.enum(['site', 'focused', 'single_page']).optional(),
   testTypes: z.array(z.enum(['functional', 'form', 'navigation', 'responsive', 'boundary', 'security'])).optional(),
   guardrails: planGuardrailsSchema.optional(),
   auth: authConfigSchema.optional(),

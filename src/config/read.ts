@@ -94,6 +94,7 @@ export type PlanCliOptions = {
   maxAgentTurns?: number
   maxSnapshots?: number
   testTypes?: string
+  exploreScope?: 'site' | 'focused' | 'single_page'
   loginUrl?: string
   username?: string
   password?: string
@@ -134,7 +135,7 @@ export function loadPlanConfig(fileConfig: AutoqaConfig, cliOptions: PlanCliOpti
     guardrails.maxTokenPerRun = DEFAULT_PLAN_GUARDRAILS.maxTokenPerRun
   }
   
-  let baseUrl = cliOptions.url || planConfig.baseUrl
+  const baseUrl = cliOptions.url || planConfig.baseUrl
   if (!baseUrl && !cliOptions.skipUrlValidation) {
     throw new Error('baseUrl is required (provide via --url or autoqa.config.json plan.baseUrl)')
   }
@@ -155,14 +156,16 @@ export function loadPlanConfig(fileConfig: AutoqaConfig, cliOptions: PlanCliOpti
   }
   
   const config: PlanConfig = {
-    baseUrl,
+    baseUrl: baseUrl!,
     maxDepth: cliOptions.depth ?? planConfig.maxDepth ?? DEFAULT_PLAN_CONFIG.maxDepth,
     maxPages: cliOptions.maxPages ?? planConfig.maxPages ?? DEFAULT_PLAN_CONFIG.maxPages,
     includePatterns: planConfig.includePatterns ?? DEFAULT_PLAN_CONFIG.includePatterns,
     excludePatterns: planConfig.excludePatterns ?? DEFAULT_PLAN_CONFIG.excludePatterns,
+    exploreScope: cliOptions.exploreScope ?? planConfig.exploreScope ?? DEFAULT_PLAN_CONFIG.exploreScope,
     testTypes,
     guardrails,
     auth,
+    loginStepsSpec: planConfig.loginStepsSpec,
   }
   
   return config

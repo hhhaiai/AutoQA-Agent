@@ -43,6 +43,14 @@ function validateUrl(value: string): string {
   }
 }
 
+function validateExploreScope(value: string): 'site' | 'focused' | 'single_page' {
+  const validScopes = ['site', 'focused', 'single_page'] as const
+  if (!validScopes.includes(value as any)) {
+    throw new Error(`Invalid explore scope: ${value}. Valid values: ${validScopes.join(', ')}`)
+  }
+  return value as 'site' | 'focused' | 'single_page'
+}
+
 
 function sanitizeErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
@@ -131,6 +139,7 @@ export function registerPlanCommand(program: Command): void {
     .option('--max-pages <number>', 'Maximum pages to visit', validatePositiveInt)
     .option('--max-agent-turns <number>', 'Maximum agent tool calls (guardrail)', validatePositiveInt)
     .option('--max-snapshots <number>', 'Maximum snapshots to capture (guardrail)', validatePositiveInt)
+    .option('--explore-scope <mode>', 'Exploration scope mode: site, focused, or single_page', validateExploreScope)
     .option('--login-url <url>', 'Login page URL (optional)', validateUrl)
     .option('--username <username>', 'Login username (optional)')
     .option('--password <password>', 'Login password (optional)')
@@ -160,6 +169,7 @@ export function registerPlanCommand(program: Command): void {
     .option('--max-pages <number>', 'Maximum pages to visit', validatePositiveInt)
     .option('--max-agent-turns <number>', 'Maximum agent tool calls (guardrail)', validatePositiveInt)
     .option('--max-snapshots <number>', 'Maximum snapshots to capture (guardrail)', validatePositiveInt)
+    .option('--explore-scope <mode>', 'Exploration scope mode: site, focused, or single_page', validateExploreScope)
     .option('--test-types <types>', 'Comma-separated list of test types')
     .option('--login-url <url>', 'Login page URL (optional)', validateUrl)
     .option('--username <username>', 'Login username (optional)')
@@ -179,6 +189,7 @@ export function registerPlanCommand(program: Command): void {
     .option('--max-pages <number>', 'Maximum pages to visit', validatePositiveInt)
     .option('--max-agent-turns <number>', 'Maximum agent tool calls (guardrail)', validatePositiveInt)
     .option('--max-snapshots <number>', 'Maximum snapshots to capture (guardrail)', validatePositiveInt)
+    .option('--explore-scope <mode>', 'Exploration scope mode: site, focused, or single_page', validateExploreScope)
     .option('--login-url <url>', 'Login page URL (optional)', validateUrl)
     .option('--username <username>', 'Login username (optional)')
     .option('--password <password>', 'Login password (optional)')

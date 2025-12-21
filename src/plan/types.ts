@@ -25,6 +25,7 @@ export type AuthConfig = {
 /**
  * Plan configuration following Tech Spec structure
  * Based on Tech Spec: ts-7-agent-based-intelligent-planner.md#PlanConfig
+ * Extended in Tech Spec: ts-8-1-8-3-plan-scope-and-executable-specs.md#PlanConfig
  */
 export type PlanConfig = {
   baseUrl: string
@@ -32,6 +33,17 @@ export type PlanConfig = {
   maxPages?: number
   includePatterns?: string[]
   excludePatterns?: string[]
+  /**
+   * Exploration scope mode controlling URL filtering behavior
+   * Based on Tech Spec: ts-8-1-8-3-plan-scope-and-executable-specs.md#3.1
+   * 
+   * - 'site': Default behavior, only domain and maxDepth constraints
+   * - 'focused': Only URLs matching includePatterns (and not excludePatterns) are in-scope
+   * - 'single_page': Explore current page interactions, limited URL changes (hash routes or includePatterns)
+   * 
+   * URL matching applies to relative URL (pathname + hash), e.g., "/live/index.html#/channel"
+   */
+  exploreScope?: 'site' | 'focused' | 'single_page'
   testTypes?: ('functional' | 'form' | 'navigation' | 'responsive' | 'boundary' | 'security')[]
   guardrails?: GuardrailConfig
   auth?: AuthConfig
