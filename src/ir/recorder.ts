@@ -61,12 +61,15 @@ export class IRRecorder {
   private readonly runId: string
   private readonly enabled: boolean
   private validationFailures: string[] = []
+  private readonly debugLocators: boolean
 
   constructor(options: IRRecorderOptions) {
     this.writer = new IRWriter(options.cwd, options.runId)
     this.specPath = options.specPath
     this.runId = options.runId
     this.enabled = options.enabled !== false
+    const debugEnv = (process.env.AUTOQA_DEBUG_LOCATORS ?? '').trim().toLowerCase()
+    this.debugLocators = debugEnv === '1' || debugEnv === 'true' || debugEnv === 'yes' || debugEnv === 'debug'
   }
 
   /**
@@ -106,6 +109,15 @@ export class IRRecorder {
       await elementHandle.dispose()
 
       const candidates = generateLocatorCandidates(fingerprint)
+
+      if (this.debugLocators && candidates.length === 0) {
+        try {
+          const msg = `IR locator generator produced 0 candidates: runId=${this.runId} tool=${toolName} specPath=${this.specPath}`
+          // eslint-disable-next-line no-console
+          process.stderr.write(`[AUTOQA_IR_LOCATOR] ${msg}\n`)
+        } catch {
+        }
+      }
 
       const actionType = toolName as ActionType
       const validatedCandidates = await validateCandidates(candidates, {
@@ -147,10 +159,28 @@ export class IRRecorder {
       const validCandidates = filterValidCandidatesByAction(preActionResult.candidates, actionType)
       const chosenLocator = chooseBestLocator(validCandidates)
 
-      if (preActionResult.candidates.length > 0 && validCandidates.length === 0) {
+      if (preActionResult.candidates.length === 0) {
+        if (this.debugLocators) {
+          try {
+            const msg = `IR locator validation received 0 candidates: runId=${this.runId} tool=${toolName} step=${stepIndex} specPath=${this.specPath}`
+            // eslint-disable-next-line no-console
+            process.stderr.write(`[AUTOQA_IR_LOCATOR] ${msg}\n`)
+          } catch {
+          }
+        }
+      } else if (validCandidates.length === 0) {
         const failureSummary = getValidationFailureSummary(preActionResult.candidates)
         if (failureSummary) {
-          this.validationFailures.push(`${toolName}[step=${stepIndex}]: ${failureSummary}`)
+          const msg = `${toolName}[step=${stepIndex}]: ${failureSummary}`
+          this.validationFailures.push(msg)
+          if (this.debugLocators) {
+            try {
+              const debugMsg = `IR locator validation failed: runId=${this.runId} tool=${toolName} step=${stepIndex} specPath=${this.specPath} :: ${failureSummary}`
+              // eslint-disable-next-line no-console
+              process.stderr.write(`[AUTOQA_IR_LOCATOR] ${debugMsg}\n`)
+            } catch {
+            }
+          }
         }
       }
 

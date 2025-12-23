@@ -61,8 +61,14 @@ function buildLocator(page: Page, candidate: LocatorCandidate): Locator | null {
         return page.locator(`[${attr}="${val}"]`)
       }
 
+      case 'cssSelector':
+        return page.locator(candidate.value)
+
       case 'text':
         return page.getByText(candidate.value)
+
+      case 'textExact':
+        return page.getByText(candidate.value, { exact: true })
 
       default:
         return null

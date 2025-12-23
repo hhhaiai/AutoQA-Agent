@@ -88,6 +88,17 @@ export function generateLocatorCandidates(fingerprint: ElementFingerprint): Loca
     })
   }
 
+  if (fingerprint.placeholder && isInputLike(fingerprint.tagName)) {
+    const tag = fingerprint.tagName!.toLowerCase()
+    const selector = `${tag}[placeholder="${escapeCssString(fingerprint.placeholder)}"]`
+    candidates.push({
+      kind: 'cssSelector',
+      value: selector,
+      code: `page.locator('${selector}')`,
+      validation: { unique: false },
+    })
+  }
+
   if (fingerprint.id) {
     candidates.push({
       kind: 'cssId',
@@ -108,6 +119,12 @@ export function generateLocatorCandidates(fingerprint: ElementFingerprint): Loca
 
   if (fingerprint.textSnippet && isClickableTag(fingerprint.tagName)) {
     const shortText = fingerprint.textSnippet.slice(0, 50)
+    candidates.push({
+      kind: 'textExact',
+      value: shortText,
+      code: `page.getByText('${escapeJsString(shortText)}', { exact: true })`,
+      validation: { unique: false },
+    })
     candidates.push({
       kind: 'text',
       value: shortText,
@@ -149,7 +166,9 @@ export function getLocatorPriority(kind: LocatorKind): number {
     getByPlaceholder: 4,
     cssId: 5,
     cssAttr: 6,
-    text: 7,
+    cssSelector: 7,
+    textExact: 8,
+    text: 9,
   }
   return priorities[kind]
 }

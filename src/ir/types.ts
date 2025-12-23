@@ -30,7 +30,9 @@ export type ElementFingerprint = {
  * 4. getByPlaceholder - Good for inputs without labels
  * 5. cssId - Stable if IDs are meaningful
  * 6. cssAttr - Fallback for other attributes
- * 7. text - Lowest priority, may be unstable
+ * 7. cssSelector - Fallback for combined tag/attribute selectors
+ * 8. textExact - Exact text match for clickable elements
+ * 9. text - Lowest priority, may be unstable
  */
 export type LocatorKind =
   | 'getByTestId'
@@ -39,6 +41,8 @@ export type LocatorKind =
   | 'getByPlaceholder'
   | 'cssId'
   | 'cssAttr'
+  | 'cssSelector'
+  | 'textExact'
   | 'text'
 
 /**

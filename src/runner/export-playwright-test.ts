@@ -878,9 +878,9 @@ function generateStepCode(
     }
   }
 
+  // Fallback: unknown or non-action step – generate a TODO line in the exported test instead of failing
   return {
-    code: '',
-    error: `Cannot generate code for step ${step.index}: "${stepText}"`,
+    code: `  // TODO: Step ${step.index} not automatically exported: ${escapeString(stepText)}`,
   }
 }
 
@@ -944,11 +944,8 @@ function generateTestFileContent(
     ?.replace(/\.md$/i, '')
     ?.replace(/-/g, ' ') ?? 'Exported Test'
 
-  // Calculate relative import path from export directory to src/test-utils/autoqa-env
-  const exportDirResolved = exportDir ?? 'tests/autoqa'
-  const depth = exportDirResolved.split('/').filter(Boolean).length
-  const relativePrefix = depth > 0 ? '../'.repeat(depth) : './'
-  const autoqaEnvImport = `${relativePrefix}src/test-utils/autoqa-env`
+  // Import helper from the npm package so generated tests work when autoqa-agent is installed as a dependency
+  const autoqaEnvImport = 'autoqa-agent/test-utils/autoqa-env'
 
   const content = `import { test, expect } from '@playwright/test'
 import { loadEnvFiles, getEnvVar } from '${autoqaEnvImport}'

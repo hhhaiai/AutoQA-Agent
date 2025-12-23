@@ -46,14 +46,34 @@ export const RUN_AGENT_ALLOWED_TOOLS = [
   'mcp__browser__assertElementVisible',
 ] as const
 
+type UiLanguage = 'en' | 'zh'
+
+function getUiLanguageFromEnv(): UiLanguage {
+  const raw = (process.env.AUTOQA_UI_LANGUAGE ?? '').trim().toLowerCase()
+  if (raw.startsWith('zh')) return 'zh'
+  if (raw.startsWith('en')) return 'en'
+  return 'en'
+}
+
 function buildPrompt(input: Pick<RunAgentOptions, 'baseUrl' | 'specPath' | 'spec'>): string {
   const pre = input.spec.preconditions.map((p) => `- ${p}`).join('\n')
   const steps = input.spec.steps.map((s) => `${s.index}. ${s.text}`).join('\n')
+
+  const uiLanguage = getUiLanguageFromEnv()
+  const uiLanguageNote =
+    uiLanguage === 'zh'
+      ? `UI language: Chinese (zh-CN).
+- When generating descriptions of UI elements (for example targetDescription for tools), use the actual Chinese labels/text from the UI.
+- Do not translate Chinese UI text into English. Prefer copying the on-screen Chinese text instead.`
+      : `UI language: English (en).
+- When generating descriptions of UI elements (for example targetDescription for tools), use the same language and wording that appears in the UI.`
 
   return `You are an AutoQA agent.
 
 Base URL: ${input.baseUrl}
 Spec Path: ${input.specPath}
+
+${uiLanguageNote}
 
 Preconditions:
 ${pre}

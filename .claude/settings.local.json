@@ -1,6 +1,0 @@
-{
-  "enabledMcpjsonServers": [
-    "playwright-test"
-  ],
-  "enableAllProjectMcpServers": true
-}

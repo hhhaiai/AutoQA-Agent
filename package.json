@@ -1,6 +1,6 @@
 {
   "name": "autoqa-agent",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "description": "Automated QA testing agent powered by Claude and Playwright",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,10 @@
   "homepage": "https://github.com/terryso/autoqa-agent#readme",
   "bin": {
     "autoqa": "dist/cli.js"
+  },
+  "exports": {
+    "./cli": "./dist/cli.js",
+    "./test-utils/autoqa-env": "./dist/test-utils/autoqa-env.js"
   },
   "engines": {
     "node": "^20.0.0 || ^22.0.0 || >=24.0.0"
