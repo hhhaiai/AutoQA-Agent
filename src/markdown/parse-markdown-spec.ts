@@ -57,11 +57,26 @@ function extractListItemText(listItemNode: any): { text: string; expectedResult?
   // Extract main text from paragraphs (excluding Expected: clauses)
   const mainTextParts: string[] = []
   for (const p of paragraphs) {
-    const text = extractNodeText(p).trim()
-    // Skip Expected: clauses in paragraphs (they should be in nested lists)
-    if (text && !/^[\s\-•]*\s*expected:/i.test(text)) {
-      mainTextParts.push(text)
+    const fullText = extractNodeText(p).trim()
+    if (!fullText) continue
+
+    // Check if this paragraph is solely an "Expected:" clause (starts with "Expected:" or "- Expected:")
+    if (/^[\s\-•]*\s*expected:\s*/i.test(fullText)) {
+      // This paragraph is only an Expected clause, skip it
+      continue
     }
+
+    // Check if the paragraph ends with an Expected clause (e.g., "Action text\nExpected: result")
+    const trailingExpectedMatch = fullText.match(/^(.+?)\n\s*[-•]?\s*expected:\s*(.+)$/is)
+    if (trailingExpectedMatch) {
+      // Extract the main text (before Expected)
+      mainTextParts.push(trailingExpectedMatch[1]!.trim())
+      // The Expected part will be extracted in the fallback section below
+      continue
+    }
+
+    // Regular paragraph, include it
+    mainTextParts.push(fullText)
   }
 
   const text = mainTextParts.join(' ').trim()
@@ -86,9 +101,16 @@ function extractListItemText(listItemNode: any): { text: string; expectedResult?
   if (!expectedResult) {
     for (const p of paragraphs) {
       const text = extractNodeText(p).trim()
-      const match = text.match(/^(?:[\s\-•]*\s*)?expected:\s*(.+)$/i)
+      // Match "Expected: ..." at the start of the paragraph
+      let match = text.match(/^[\s\-•]*\s*expected:\s*(.+)$/i)
       if (match) {
-        expectedResult = match[1].trim()
+        expectedResult = match[1]!.trim()
+        break
+      }
+      // Match "...action text\nExpected: ..." format
+      match = text.match(/^(?:.+?)\n\s*[-•]?\s*expected:\s*(.+)$/is)
+      if (match) {
+        expectedResult = match[1]!.trim()
         break
       }
     }
