@@ -181,18 +181,50 @@ export function sortByPriority(candidates: LocatorCandidate[]): LocatorCandidate
 }
 
 /**
+ * Extract role name from getByRole locator value (e.g., "button:Save" -> "button").
+ */
+function extractRoleFromLocator(value: string): string | undefined {
+  const match = value.match(/^(\w+):/)
+  return match?.[1]
+}
+
+/**
+ * Check if a locator kind represents an interactive element that should prefer getByRole.
+ */
+function shouldPreferRoleOverText(candidate: LocatorCandidate): boolean {
+  if (candidate.kind !== 'getByRole') return false
+  const role = extractRoleFromLocator(candidate.value)
+  if (!role) return false
+  // Prefer getByRole for these interactive elements even if not unique
+  return ['button', 'link', 'textbox', 'combobox', 'listbox'].includes(role.toLowerCase())
+}
+
+/**
  * Choose the best locator from validated candidates.
  * Returns the highest priority candidate that passed validation.
+ *
+ * For interactive elements (button, link, etc.), getByRole is preferred over text-based
+ * locators even if it has lower validation scores, because roles are more stable than text.
  */
 export function chooseBestLocator(candidates: LocatorCandidate[]): LocatorCandidate | undefined {
   const sorted = sortByPriority(candidates)
 
+  // First pass: try to find a fully validated candidate
   for (const candidate of sorted) {
     if (candidate.validation.unique && candidate.validation.visible !== false) {
       if (candidate.validation.fingerprintMatch !== false) {
         return candidate
       }
     }
+  }
+
+  // Second pass: for interactive elements, prefer getByRole even if not fully validated
+  // This is more stable than text-based locators which can break with translations
+  const roleCandidate = sorted.find((c) =>
+    shouldPreferRoleOverText(c) && c.validation.visible !== false && c.validation.fingerprintMatch !== false
+  )
+  if (roleCandidate) {
+    return roleCandidate
   }
 
   return undefined

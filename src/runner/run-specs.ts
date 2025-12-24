@@ -13,7 +13,7 @@ import {
   getRelativeTracePath,
   ensureTraceDir,
 } from './trace-paths.js'
-import { exportPlaywrightTest } from './export-playwright-test.js'
+import { exportFromIR } from './export-from-ir.js'
 import { getRelativeExportPath } from './export-paths.js'
 
 type ArtifactMode = 'all' | 'fail' | 'none'
@@ -388,7 +388,7 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
         // Export Playwright test if spec succeeded
         if (specOk) {
           try {
-            const exportResult = await exportPlaywrightTest({
+            const exportResult = await exportFromIR({
               cwd,
               runId: options.runId,
               specPath: spec.specPath,

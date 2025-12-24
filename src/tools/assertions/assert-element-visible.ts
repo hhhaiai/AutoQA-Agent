@@ -30,10 +30,52 @@ const STOP_WORDS = new Set([
   'link',
   'element',
   'item',
+  'input',
+  'field',
+  'textbox',
+  'text',
+  'box',
+  'form',
+  'id',
+  'name',
+  'placeholder',
+  'data',
+  'test',
 ])
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function extractQuotedPhrases(value: string): string[] {
+  const out: string[] = []
+  const re = /"([^"]+)"|'([^']+)'/g
+  for (const match of value.matchAll(re)) {
+    const v = (match[1] ?? match[2] ?? '').trim()
+    if (v) out.push(v)
+  }
+  return out
+}
+
+function uniqueStrings(values: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const v of values) {
+    const k = v.trim()
+    if (!k) continue
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(k)
+  }
+  return out
+}
+
+function buildNameCandidates(targetDescription: string): string[] {
+  const raw = targetDescription.trim()
+  const quoted = extractQuotedPhrases(raw)
+  const normalized = normalizeForNameMatch(raw)
+  const variants = uniqueStrings([raw, ...quoted, normalized])
+  return variants
 }
 
 function normalizeForNameMatch(value: string): string {
@@ -130,6 +172,21 @@ export async function resolveVisibleElement(page: Page, targetDescription: strin
     candidates.push(page.getByRole('heading', { name: targetDescription }))
   } catch {}
 
+  // Add textbox placeholder matching (for input elements with placeholder text)
+  try {
+    candidates.push(page.getByPlaceholder(targetDescription))
+  } catch {}
+
+  const nameCandidates = buildNameCandidates(targetDescription)
+  for (const name of nameCandidates) {
+    try {
+      candidates.push(page.getByPlaceholder(name))
+    } catch {}
+    try {
+      candidates.push(page.getByRole('textbox', { name }))
+    } catch {}
+  }
+
   try {
     candidates.push(page.getByText(targetDescription))
   } catch {}
@@ -154,6 +211,16 @@ export async function resolveVisibleElement(page: Page, targetDescription: strin
 
     try {
       candidates.push(page.getByText(fuzzy))
+    } catch {}
+
+    // Fuzzy placeholder matching
+    try {
+      candidates.push(page.getByPlaceholder(fuzzy))
+    } catch {}
+
+    // Fuzzy textbox role matching
+    try {
+      candidates.push(page.getByRole('textbox', { name: fuzzy }))
     } catch {}
   }
 

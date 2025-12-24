@@ -89,7 +89,7 @@ Rules:
 - Keep tool inputs minimal and avoid leaking secrets.
 - Step tracking: For EVERY tool call, include the stepIndex parameter matching the current step number (1-indexed from the Steps list above). This is critical for tracking progress and error recovery.
 - Ref-first execution:
-  - Before each interaction step (click/fill/select_option), call snapshot to get an accessibility snapshot.
+  - Before each interaction step (click/fill/select_option/assertElementVisible/assertTextPresent), call snapshot to get an accessibility snapshot.
   - Find the target element in the snapshot and extract its ref like [ref=e15].
   - Call the action tool using ref (preferred) instead of targetDescription.
   - If the ref is not found or action fails, capture a new snapshot and retry once.
