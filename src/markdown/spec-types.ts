@@ -4,6 +4,8 @@ export type MarkdownSpecStep = {
   index: number
   text: string
   kind: MarkdownSpecStepKind
+  /** Expected result extracted from "- Expected: ..." lines */
+  expectedResult?: string
 }
 
 export type MarkdownSpec = {

@@ -406,13 +406,6 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
                 exportPath: relativeExportPath,
                 ok: true,
               })
-
-              logger.log({
-                event: 'autoqa.spec.exported',
-                runId: options.runId,
-                specPath: spec.specPath,
-                exportPath: relativeExportPath,
-              })
             } else {
               const relativeExportPath = getRelativeExportPath(cwd, spec.specPath, options.exportDir)
               exports.push({
@@ -420,14 +413,6 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
                 exportPath: relativeExportPath,
                 ok: false,
                 reason: exportResult.reason,
-              })
-
-              logger.log({
-                event: 'autoqa.spec.export_failed',
-                runId: options.runId,
-                specPath: spec.specPath,
-                reason: exportResult.reason,
-                ...(exportResult.missingLocators ? { missingLocators: exportResult.missingLocators } : {}),
               })
             }
           } catch (exportErr: unknown) {
@@ -437,13 +422,6 @@ export async function runSpecs(options: RunSpecsOptions): Promise<RunSpecsResult
               specPath: spec.specPath,
               exportPath: getRelativeExportPath(cwd, spec.specPath, options.exportDir),
               ok: false,
-              reason: `Export error: ${exportErrMsg}`,
-            })
-
-            logger.log({
-              event: 'autoqa.spec.export_failed',
-              runId: options.runId,
-              specPath: spec.specPath,
               reason: `Export error: ${exportErrMsg}`,
             })
           }

@@ -43,18 +43,66 @@ function findSectionRange(children: any[], headingIndex: number): { start: numbe
   return { start, end }
 }
 
-function extractListItemText(listItemNode: any): string {
+/**
+ * Extract text from a list item, separating main text from Expected: clauses.
+ * Returns an object with the main text and optional expected result.
+ */
+function extractListItemText(listItemNode: any): { text: string; expectedResult?: string } {
   const children: any[] = Array.isArray(listItemNode?.children) ? listItemNode.children : []
+
+  // Separate paragraphs from nested lists (which contain Expected: clauses)
   const paragraphs = children.filter((n) => n?.type === 'paragraph')
-  if (paragraphs.length > 0) {
-    return paragraphs
-      .map((p) => extractNodeText(p).trim())
-      .filter((t) => t.length > 0)
-      .join(' ')
-      .trim()
+  const nestedLists = children.filter((n) => n?.type === 'list')
+
+  // Extract main text from paragraphs (excluding Expected: clauses)
+  const mainTextParts: string[] = []
+  for (const p of paragraphs) {
+    const text = extractNodeText(p).trim()
+    // Skip Expected: clauses in paragraphs (they should be in nested lists)
+    if (text && !/^[\s\-•]*\s*expected:/i.test(text)) {
+      mainTextParts.push(text)
+    }
   }
 
-  return extractNodeText(listItemNode).trim()
+  const text = mainTextParts.join(' ').trim()
+
+  // Extract expectedResult from nested list items starting with "Expected:"
+  let expectedResult: string | undefined
+  for (const list of nestedLists) {
+    const items: any[] = Array.isArray(list?.children) ? list.children : []
+    for (const item of items) {
+      const itemText = extractNodeText(item).trim()
+      // Match "Expected:", "- Expected:", "• Expected:", etc.
+      if (/^[\s\-•]*\s*expected:\s*/i.test(itemText)) {
+        // Remove the "Expected:" prefix
+        expectedResult = itemText.replace(/^[\s\-•]*\s*expected:\s*/i, '').trim()
+        break
+      }
+    }
+    if (expectedResult) break
+  }
+
+  // Fallback: if no nested list, check for "Expected:" in paragraphs
+  if (!expectedResult) {
+    for (const p of paragraphs) {
+      const text = extractNodeText(p).trim()
+      const match = text.match(/^(?:[\s\-•]*\s*)?expected:\s*(.+)$/i)
+      if (match) {
+        expectedResult = match[1].trim()
+        break
+      }
+    }
+  }
+
+  return expectedResult ? { text, expectedResult } : { text }
+}
+
+/**
+ * Legacy function that returns only text (for backward compatibility).
+ */
+function extractListItemTextLegacy(listItemNode: any): string {
+  const result = extractListItemText(listItemNode)
+  return result.text
 }
 
 function collectListItemTexts(listNode: any): string[] {
@@ -63,7 +111,7 @@ function collectListItemTexts(listNode: any): string[] {
 
   for (const item of items) {
     if (item?.type !== 'listItem') continue
-    const t = extractListItemText(item)
+    const t = extractListItemTextLegacy(item)  // Use legacy version for preconditions
     if (t.length > 0) texts.push(t)
   }
 
@@ -177,14 +225,24 @@ export function parseMarkdownSpec(markdown: string): ParseMarkdownSpecResult {
 
   const startIndex: number = typeof stepsListNode.start === 'number' ? stepsListNode.start : 1
 
-  const steps: MarkdownSpecStep[] = rawStepTexts.map((text, idx) => {
+  // Extract step items with their expectedResult
+  const stepItems: Array<{ text: string; expectedResult?: string }> = []
+  const items: any[] = Array.isArray(stepsListNode?.children) ? stepsListNode.children : []
+  for (const item of items) {
+    if (item?.type !== 'listItem') continue
+    const extracted = extractListItemText(item)
+    stepItems.push(extracted)
+  }
+
+  const steps: MarkdownSpecStep[] = stepItems.map((step, idx) => {
     const index = startIndex + idx
-    const kind = classifyStepKind(text)
+    const kind = classifyStepKind(step.text)
 
     return {
       index,
-      text,
+      text: step.text,
       kind,
+      expectedResult: step.expectedResult,
     }
   })
 

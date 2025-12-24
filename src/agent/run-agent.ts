@@ -57,7 +57,13 @@ function getUiLanguageFromEnv(): UiLanguage {
 
 function buildPrompt(input: Pick<RunAgentOptions, 'baseUrl' | 'specPath' | 'spec'>): string {
   const pre = input.spec.preconditions.map((p) => `- ${p}`).join('\n')
-  const steps = input.spec.steps.map((s) => `${s.index}. ${s.text}`).join('\n')
+  const steps = input.spec.steps.map((s) => {
+    let line = `${s.index}. ${s.text}`
+    if (s.expectedResult) {
+      line += `\n   - Expected: ${s.expectedResult}`
+    }
+    return line
+  }).join('\n')
 
   const uiLanguage = getUiLanguageFromEnv()
   const uiLanguageNote =
@@ -98,6 +104,7 @@ Rules:
   - For icon-only UI (e.g. the cart icon in the top-right on SauceDemo inventory page), prefer stable attribute-based targetDescription instead of ref, e.g. data-test=shopping-cart-link or class=shopping_cart_link.
 - Assertion requirement (CRITICAL):
   - For EVERY step that starts with "Verify" or contains verification/assertion intent, you MUST call at least one assertion tool (assertTextPresent or assertElementVisible) with the correct stepIndex.
+  - For EVERY step that has an "Expected:" clause, you MUST also call an assertion tool to verify the expected outcome after performing the action.
   - Do NOT skip assertion tool calls even if you can visually confirm the result from a snapshot. The assertion tool call is required for test recording.
   - For sorting/ordering verification, assert that a specific expected text (e.g. the first product name or price after sorting) is present on the page.
   - Example: To verify "sorted by price ascending", call assertTextPresent with the expected lowest price like "$7.99".

@@ -182,4 +182,52 @@ Some content
 
     expect(result.value.steps[0]).toEqual({ index: 1, text: 'Do the thing With more detail', kind: 'action' })
   })
+
+  it('extracts expectedResult from "- Expected:" clause in step text', () => {
+    const md = `# Title
+
+## Preconditions
+- Logged in
+
+## Steps
+1. Click the 'Create Channel' or 'Submit' button
+   - Expected: Form submission initiates and success message appears indicating channel creation
+`
+
+    const result = parseMarkdownSpec(md)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.value.steps[0]).toEqual({
+      index: 1,
+      text: "Click the 'Create Channel' or 'Submit' button",
+      kind: 'action',
+      expectedResult: 'Form submission initiates and success message appears indicating channel creation',
+    })
+  })
+
+  it('extracts expectedResult from "Expected:" clause (without dash)', () => {
+    const md = `# Title
+
+## Preconditions
+- Logged in
+
+## Steps
+1. Click the 'Create Channel' or 'Submit' button
+   Expected: Form submission initiates and success message appears
+`
+
+    const result = parseMarkdownSpec(md)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.value.steps[0]).toEqual({
+      index: 1,
+      text: "Click the 'Create Channel' or 'Submit' button",
+      kind: 'action',
+      expectedResult: 'Form submission initiates and success message appears',
+    })
+  })
 })
