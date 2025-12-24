@@ -102,12 +102,19 @@ Rules:
   - Only if ref-based action is not possible, fall back to using targetDescription.
   - NEVER guess or invent a ref. A ref must be exactly like e15 and must be copied from a snapshot in this run.
   - For icon-only UI (e.g. the cart icon in the top-right on SauceDemo inventory page), prefer stable attribute-based targetDescription instead of ref, e.g. data-test=shopping-cart-link or class=shopping_cart_link.
-- Assertion requirement (CRITICAL):
-  - For EVERY step that starts with "Verify" or contains verification/assertion intent, you MUST call at least one assertion tool (assertTextPresent or assertElementVisible) with the correct stepIndex.
-  - For EVERY step that has an "Expected:" clause, you MUST also call an assertion tool to verify the expected outcome after performing the action.
-  - Do NOT skip assertion tool calls even if you can visually confirm the result from a snapshot. The assertion tool call is required for test recording.
-  - For sorting/ordering verification, assert that a specific expected text (e.g. the first product name or price after sorting) is present on the page.
-  - Example: To verify "sorted by price ascending", call assertTextPresent with the expected lowest price like "$7.99".
+
+=== ASSERTION REQUIREMENTS (CRITICAL - MUST FOLLOW) ===
+
+1. Steps starting with "Verify" or "Assert": MUST call an assertion tool
+2. Steps with an "Expected:" clause: MUST call an assertion tool AFTER the action
+3. Examples of when you MUST assert:
+   - After clicking a button with "Expected: success message appears" → call assertElementVisible or assertTextPresent
+   - After submitting a form with "Expected: confirmation shown" → call assertElementVisible or assertTextPresent
+   - After navigation with "Expected: page loads" → call assertElementVisible for a key element on the page
+
+If a step has an "Expected:" clause, you MUST perform the action FIRST, THEN call an assertion tool to verify the expected outcome BEFORE moving to the next step.
+
+DO NOT skip assertions even if the snapshot shows the expected result. The assertion tool call is REQUIRED for test recording.
 `
 }
 
