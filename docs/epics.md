@@ -802,3 +802,167 @@ So that 产生的用例既具备自动化可执行性，又符合资深测试工
 **FRs covered:** FR15, FR16
 
 Tech Spec: `docs/sprint-artifacts/ts-8-1-8-3-plan-scope-and-executable-specs.md`
+
+## Epic 9: 交互式修复模式（Interactive Repair Mode）
+
+用户完成该 Epic 后，当 `autoqa run` 导出失败（由于缺少 `chosenLocator`）时，系统可以自动启动交互式修复模式：通过 Playwright 重放 IR 到失败步骤，允许用户在真实页面上选择元素生成新的 locator，或继续手动操作完成测试，最终保存修复结果并重新导出。
+
+**FRs covered:** 延续 FR8, FR9（增强 IR 导出的健壮性）
+
+### Story 9.1: 导出失败时自动启动交互式修复模式
+
+As a QA 工程师,
+I want 当 `autoqa run` 导出失败时，系统自动启动交互式修复模式而不是直接报错退出,
+So that 我可以在不重启的情况下直接修复失败的 locator，而不是手动修改代码或重新运行整个测试。
+
+**FRs covered:** FR8, FR9
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** `autoqa run` 执行完成但导出失败（由于某些步骤缺少 `chosenLocator`）
+**When** 系统检测到导出失败
+**Then** 应自动启动交互式修复模式（而非直接报错退出）
+**And** 应输出清晰的提示说明进入修复模式
+
+**Given** 进入交互式修复模式
+**When** 用户确认启动修复
+**Then** 系统应启动一个有头浏览器（`headless: false`）
+**And** 应读取 IR 文件中失败的步骤信息
+
+### Story 9.2: 自动重放 IR 到失败步骤
+
+As a QA 工程师,
+I want 修复模式自动重放 IR 中成功的步骤到失败点,
+So that 我可以在正确的页面状态下进行修复，而不需要手动登录或导航到目标页面。
+
+**FRs covered:** FR8
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** IR 中有步骤 1-5 成功（有 `chosenLocator`），步骤 6 失败（缺少 `chosenLocator`）
+**When** 启动修复模式
+**Then** 系统应自动执行步骤 1-5 到达步骤 6 的前置状态
+**And** 执行应使用 IR 中记录的 `chosenLocator` 或 `toolInput`
+
+**Given** 某个步骤在重放时失败（例如页面结构变化导致 locator 失效）
+**When** 重放无法继续
+**Then** 系统应暂停并提示用户手动操作到目标状态
+**And** 应显示失败的步骤信息和建议
+
+**Given** IR 中从第一个步骤就缺少 `chosenLocator`
+**When** 启动修复模式
+**Then** 系统应尝试使用 IR 中记录的 `pageUrl` 直接导航到失败页面
+**And** 应提示用户可能需要手动登录或准备状态
+
+### Story 9.3: 页面元素选择器（Element Picker）
+
+As a QA 工程师,
+I want 在修复模式下通过点击页面上的元素来生成 Playwright locator,
+So that 我不需要手动编写 selector 就能获得准确的定位器。
+
+**FRs covered:** FR9
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** 修复模式已启动且页面处于正确状态
+**When** 用户启用元素选择模式
+**Then** 鼠标悬停在元素上时应显示红色高亮边框
+**And** 应显示元素的简短信息（tagName、text、role 等）
+
+**Given** 用户点击页面上的某个元素
+**When** 元素被选中
+**Then** 系统应生成多个 Playwright locator 候选（按优先级排序）
+**And** 应实时验证每个候选的唯一性（`count === 1`）
+**And** 应在终端/控制台显示候选列表和验证结果
+
+**Given** 生成的 locator 候选
+**When** 显示候选列表
+**Then** 应按优先级排序（data-testid > role+name > id > text > class > tag）
+**And** 应标记每个候选是否唯一（✅ 唯一 / ⚠️ N 个匹配）
+
+### Story 9.4: 保存修复结果并重新导出
+
+As a QA 工程师,
+I want 在修复完成后保存修复结果并自动重新导出测试代码,
+So that 修复可以被持久化，且不需要手动重新运行整个测试。
+
+**FRs covered:** FR8, FR9
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** 用户通过元素选择器选择了目标元素
+**When** 用户确认使用某个 locator 候选
+**Then** 系统应将修复保存到 `repairs.json` 文件（与 IR 同目录）
+**And** 修复记录应包含：`runId`、`specPath`、`stepIndex`、`chosenLocator`
+
+**Given** 修复已保存
+**When** 重新执行导出流程
+**Then** 导出器应优先使用 `repairs.json` 中的 `chosenLocator`
+**And** 应生成完整的 `@playwright/test` 文件
+
+**Given** 导出成功
+**When** 修复模式结束
+**Then** 应输出导出成功的提示和文件路径
+**And** 应以退出码 `0` 结束（表示修复成功）
+
+### Story 9.5: 支持用户手动继续操作（Manual Continuation）
+
+As a QA 工程师,
+I want 在修复模式下除了选择元素外，也可以继续手动执行剩余步骤,
+So that 当自动重放失败或页面状态复杂时，我仍可以完成测试并生成导出代码。
+
+**FRs covered:** FR8
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** 重放无法自动继续（例如步骤 6 缺少 locator 且无法恢复）
+**When** 用户选择手动模式
+**Then** 系统应允许用户在浏览器中手动完成剩余操作
+**And** 应监听用户的页面操作并记录到 IR
+
+**Given** 用户手动完成了测试流程
+**When** 用户触发"完成修复"
+**Then** 系统应将手动操作的步骤追加到 IR
+**And** 应生成包含手动步骤的完整导出代码
+
+**Given** 用户在手动模式下填写了表单字段（如用户名、密码）
+**When** 记录到 IR
+**Then** 敏感字段应使用模板变量占位符（如 `{{USERNAME}}`）而非明文
+**And** 导出的代码应引用环境变量
+
+### Story 9.6: CLI 命令入口（`autoqa repair`）
+
+As a QA 工程师,
+I want 可以通过单独的 `autoqa repair` 命令启动修复模式,
+So that 我不需要重新运行整个测试就可以修复之前失败的导出。
+
+**FRs covered:** FR8, FR9
+
+Tech Spec: `docs/sprint-artifacts/epic-9-interactive-repair-mode.md`
+
+**Acceptance Criteria:**
+
+**Given** 之前有一次运行（runId）导出失败
+**When** 运行 `autoqa repair --runId <runId>`
+**Then** 系统应读取该 run 的 IR 文件
+**And** 应启动修复模式（与 Story 9.1-9.5 相同的流程）
+
+**Given** 多个 spec 需要修复
+**When** 运行 `autoqa repair --runId <runId> --spec <specPath>`
+**Then** 系统应仅修复指定的 spec
+**And** 其他 spec 不受影响
+
+**Given** 某个步骤有修复记录（`repairs.json` 中已存在）
+**When** 启动修复模式
+**Then** 系统应显示已有的修复记录
+**And** 应允许用户覆盖或保留原有修复
