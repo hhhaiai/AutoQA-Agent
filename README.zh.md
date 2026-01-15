@@ -5,7 +5,6 @@
 [![NPM 下载量](https://img.shields.io/npm/dm/autoqa-agent?style=flat-square)](https://www.npmjs.com/package/autoqa-agent)
 [![License](https://img.shields.io/github/license/terryso/autoqa-agent?style=flat-square)](https://github.com/terryso/autoqa-agent)
 [![DeepWiki](https://img.shields.io/badge/DeepWiki-AutoQA--Agent-blue?style=flat-square)](https://deepwiki.com/terryso/AutoQA-Agent)
-[![WeChat](https://img.shields.io/badge/WeChat-Group-green?style=flat-square&logo=wechat&logoColor=white)](https://d.doloo.top/uaaafvhl/sPQViF)
 
 **[中文](README.zh.md) | [English](README.md)**
 
